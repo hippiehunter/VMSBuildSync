@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>netcoreapp3.1</TargetFramework>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\SSH.NET\src\Renci.SshNet\Renci.SshNet.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="System.Security.Permissions" Version="4.7.0" />
+      <PackageReference Include="System.Text.Encoding.CodePages" Version="5.0.0-rc.2.20475.5" />
+    </ItemGroup>
+
+    <Import Project="..\DotNetZip\src\Zip.Shared\Zip.Shared.projitems" Label="Shared" />
+
+    <Import Project="..\DotNetZip\src\Zlib.Shared\Zlib.Shared.projitems" Label="Shared" />
+
+</Project>
