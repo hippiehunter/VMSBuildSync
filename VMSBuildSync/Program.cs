@@ -56,6 +56,12 @@ namespace VMSBuildSync
                     VMSFileConfig.MakeUIC(uicUser, uicGroup))));
                 regexs.Add(Tuple.Create(new Regex("\\.(gif|tlb|res|jpg|png)$"), VMSFileConfig.MakeStream(FileProtection.Read | FileProtection.Write | FileProtection.Delete,
                     VMSFileConfig.MakeUIC(uicUser, uicGroup))));
+                regexs.Add(Tuple.Create(new Regex("((encrypt.|enc1011)\\.dat)$"), VMSFileConfig.MakeStream(FileProtection.Read | FileProtection.Write | FileProtection.Delete,
+                    VMSFileConfig.MakeUIC(uicUser, uicGroup))));
+                regexs.Add(Tuple.Create(new Regex("(synxml\\/test7(0|1)\\.txt)$"), VMSFileConfig.MakeStream(FileProtection.Read | FileProtection.Write | FileProtection.Delete,
+                    VMSFileConfig.MakeUIC(uicUser, uicGroup))));
+                regexs.Add(Tuple.Create(new Regex("((baseline\\/test64|baseline\\/test70|baseline\\/test71)\\.xml)$"), VMSFileConfig.MakeStream(FileProtection.Read | FileProtection.Write | FileProtection.Delete,
+                    VMSFileConfig.MakeUIC(uicUser, uicGroup))));
                 regexs.Add(Tuple.Create(new Regex("this_is_a_binary_file"), VMSFileConfig.MakeStream(FileProtection.Read | FileProtection.Write | FileProtection.Delete,
                     VMSFileConfig.MakeUIC(uicUser, uicGroup))));
 
@@ -117,9 +123,9 @@ namespace VMSBuildSync
 
                 Logger.WriteLine(10, $"startup event({Process.GetCurrentProcess().Id}), args were {string.Join(' ', args)}");
 
-                using (var remoteSync = new RemoteSync(args[0], args[1], args[2], args[3], args[4], args[5], regexs, args[6]))
+                TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+                using (var remoteSync = new RemoteSync(args[0], args[1], args[2], args[3], args[4], args[5], regexs, args[6], tcs))
                 {
-                    TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
                     Console.WriteLine("Press enter to exit remote sftp sync");
                     Console.CancelKeyPress += (sender, args) =>
                     {

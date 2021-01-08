@@ -28,6 +28,7 @@ namespace VMSBuildSync
         ShellStream _shellStream;
         SshClient _client;
         FileSystemWatcher _fsw;
+        TaskCompletionSource<bool> _tcs;
         private DirectoryZip _directoryZip;
         HashSet<string> _activeDirSync = new HashSet<string>();
         private static Regex newLineRegex = new Regex(@"\w*\$\s*$");
@@ -39,13 +40,14 @@ namespace VMSBuildSync
         //if the value is non blank and differs from the current platform we'll perform line ending translation
         //the size change caused by this line ending translation is taken into account when comparing remote and local file sizes
         public RemoteSync(string host, string username, string password, string localRootDirectory,
-            string remoteRootDirectory, string searchPattern, List<Tuple<Regex, VMSFileConfig>> remoteAttributeMapper = null, string forceOverride = null)
+            string remoteRootDirectory, string searchPattern, List<Tuple<Regex, VMSFileConfig>> remoteAttributeMapper = null, string forceOverride = null, TaskCompletionSource<bool> tcs = null)
         {
             _forceOverride = false;
             if (forceOverride != null)
             {
                 bool.TryParse(forceOverride, out _forceOverride);
             }
+            _tcs = tcs;
             _host = host;
             _username = username;
             _password = password;
@@ -58,6 +60,7 @@ namespace VMSBuildSync
             _shellStream = _client.CreateShellStream("sych - unzip", 80, 120, 640, 480, short.MaxValue);
             _shellStream.Expect(newLineRegex, TimeSpan.FromSeconds(SSHTimeout));
             _sftp = new SftpClient(host, username, password);
+            _sftp.OperationTimeout = TimeSpan.FromSeconds(SSHTimeout);
             _sftp.Connect();
             var tsk = InitialSync(_localRootDirectory, _remoteRootDirectory);
 
@@ -65,14 +68,31 @@ namespace VMSBuildSync
             {
                 Logger.WriteLine(10, "initial sync completed");
                 _fsw = new FileSystemWatcher(localRootDirectory, searchPattern);
+                _fsw.InternalBufferSize = 1024 * 64;
                 _fsw.IncludeSubdirectories = true;
                 _fsw.NotifyFilter = NotifyFilters.LastWrite;
                 _fsw.Changed += Fsw_Changed;
+                _fsw.Error += _fsw_Error;
                 _fsw.EnableRaisingEvents = true;
             });
         }
 
-        
+        private void _fsw_Error(object sender, ErrorEventArgs e)
+        {
+            var exception = e.GetException();
+            switch (exception)
+            {
+                case UnauthorizedAccessException uae:
+                    if(!uae.Message.Contains(Path.DirectorySeparatorChar + ".git" + Path.DirectorySeparatorChar))
+                        Logger.WriteLine(10, $"file system watcher errored with {exception.ToString()}");
+                    break;
+                default:
+                    Logger.WriteLine(10, $"file system watcher errored with {exception.ToString()}");
+                    break;
+            }
+            
+        }
+
         public async Task<IEnumerable<FileInfo>> SyncDirectoryAsync(string sourcePath, string destinationPath, string searchPattern)
         {
             var synchedFiles = new List<FileInfo>();
@@ -131,16 +151,12 @@ namespace VMSBuildSync
                         tempFileName = Path.GetFullPath(Path.Combine(_localRootDirectory, "../", Process.GetCurrentProcess().Id.ToString() + "tmpzip.zip"));
                         _directoryZip.MakeZipForDirectory(tempFileName, zipList,
                             cleanDirectoryListing.ToDictionary(
-                                file =>
-                                {
-                                    var remoteName = Path.GetFileName(file.Key);
-                                    if (remoteName.EndsWith("."))
-                                    {
-                                        remoteName = remoteName.Substring(0, remoteName.Length - 1);
-                                    }
-                                    return remoteName;
-                                },
-                                file => (int)file.Value.Length, StringComparer.OrdinalIgnoreCase), _forceOverride);
+                                GetFileName,
+                                file => (int)file.Value.Length, StringComparer.OrdinalIgnoreCase),
+                            cleanDirectoryListing.ToDictionary(
+                                GetFileName,
+                                file => file.Value.LastWriteTime, StringComparer.OrdinalIgnoreCase),
+                            _forceOverride);
 
                         using var madeZip = ZipFile.Open(tempFileName, ZipArchiveMode.Read);
 
@@ -182,6 +198,16 @@ namespace VMSBuildSync
             return synchedFiles;
         }
 
+        private static string GetFileName(KeyValuePair<string, SftpFile> file)
+        {
+            var remoteName = Path.GetFileName(file.Key);
+            if (remoteName.EndsWith("."))
+            {
+                remoteName = remoteName.Substring(0, remoteName.Length - 1);
+            }
+            return remoteName;
+        }
+
         public async Task SSHWriteLine(string text)
         {
             try
@@ -198,7 +224,19 @@ namespace VMSBuildSync
                 catch
                 {
                 }
-                _shellStream = _client.CreateShellStream("sych - unzip", 80, 120, 640, 480, short.MaxValue);
+
+                if (!_client.IsConnected)
+                    _client.Connect();
+                try
+                {
+                    _shellStream = _client.CreateShellStream("sync - unzip", 80, 120, 640, 480, short.MaxValue);
+                }
+                catch
+                {
+                    _client.Disconnect();
+                    _client.Connect();
+                    _shellStream = _client.CreateShellStream("sync - unzip", 80, 120, 640, 480, short.MaxValue);
+                }
                 _shellStream.Expect(newLineRegex, TimeSpan.FromSeconds(SSHTimeout));
                 _shellStream.WriteLine(text);
             }
@@ -220,7 +258,7 @@ namespace VMSBuildSync
                 catch
                 {
                 }
-                _shellStream = _client.CreateShellStream("sych - unzip", 80, 120, 640, 480, short.MaxValue);
+                _shellStream = _client.CreateShellStream("sync - unzip", 80, 120, 640, 480, short.MaxValue);
                 _shellStream.Expect(newLineRegex, TimeSpan.FromSeconds(SSHTimeout));
             }
 
@@ -265,7 +303,7 @@ namespace VMSBuildSync
                 else
                 {
                     Logger.WriteLine(2, $"Directory {localPath} is being created at {remotePath}");
-                    _sftp.CreateDirectory(remotePath);
+                    await CreateDirectory(_sftp, remotePath);
                 }
             }
             catch (Exception ex)
@@ -284,7 +322,7 @@ namespace VMSBuildSync
                             Logger.WriteLine(2, $"Directory {localPath + Path.DirectorySeparatorChar + directoryName} is being created at {remotePath + " / " + directoryName}");
                             try
                             {
-                                _sftp.CreateDirectory(remotePath + "/" + directoryName);
+                                await CreateDirectory(_sftp, remotePath + "/" + directoryName);
                             }
                             catch (SshException ex)
                             {
@@ -306,16 +344,86 @@ namespace VMSBuildSync
             await SyncDirectoryAsync( localPath, remotePath, _searchPattern);
         }
 
+        private static async Task<T> SSHRetryReset<T>(SftpClient sftp, Func<Task<T>> action)
+        {
+            int retryCount = 0;
+            var retrying = true;
+            while (retrying && (retryCount++ < 100))
+            {
+                try
+                {
+                    return await action();
+                }
+                catch (InvalidOperationException)
+                {
+                    //reset connection and retry
+                    if (sftp.IsConnected)
+                    {
+                        sftp.Disconnect();
+                    }
+                    sftp.Connect();
+                    retrying = true;
+                }
+                catch (Renci.SshNet.Common.SshOperationTimeoutException ex)
+                {
+                    sftp.Disconnect();
+                    sftp.Connect();
+                    retrying = true;
+                }
+                catch (Renci.SshNet.Common.SshException ex)
+                {
+                    if (ex.Message.Contains("channel was closed", StringComparison.OrdinalIgnoreCase))
+                    {
+                        sftp.Disconnect();
+                        sftp.Connect();
+                        retrying = true;
+                    }
+                    else if (ex.Message.Contains("Client not connected", StringComparison.OrdinalIgnoreCase))
+                    {
+                        //reset connection and retry
+                        if (sftp.IsConnected)
+                        {
+                            sftp.Disconnect();
+                        }
+                        sftp.Connect();
+                        retrying = true;
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
+            }
+            throw new InvalidOperationException("attempted to retry operation 100 times, continued to fail");
+        }
+
+        public static async Task CreateDirectory(SftpClient sftp, string directoryPath)
+        {
+            await SSHRetryReset(sftp, () =>
+            {
+                sftp.CreateDirectory(directoryPath);
+                return Task.FromResult(true);
+            });
+        }
+
         public static async Task UploadFileAsync(SftpClient sftp, Stream file, string destination)
         {
             Func<Stream, string, AsyncCallback, object, IAsyncResult> begin = (stream, path, callback, state) => sftp.BeginUploadFile(stream, path, true, callback, state, null);
-            await Task.Factory.FromAsync(begin, sftp.EndUploadFile, file, destination, null);
+
+            await SSHRetryReset(sftp, async () =>
+            {
+                await Task.Factory.FromAsync(begin, sftp.EndUploadFile, file, destination, null);
+                return true;
+            });
         }
 
-        public static Task<IEnumerable<SftpFile>> ListDirectoryAsync(SftpClient sftp, string path)
+        public static async Task<IEnumerable<SftpFile>> ListDirectoryAsync(SftpClient sftp, string path)
         {
             Func<string, AsyncCallback, object, IAsyncResult> begin = (bpath, callback, state) => sftp.BeginListDirectory(bpath, callback, state, null);
-            return Task.Factory.FromAsync(begin, sftp.EndListDirectory, path, null);
+            return await SSHRetryReset(sftp, async () =>
+            {
+                return await Task.Factory.FromAsync(begin, sftp.EndListDirectory, path, null);
+            });
         }
 
 
@@ -348,37 +456,67 @@ namespace VMSBuildSync
 
         private async void Fsw_Changed(object sender, FileSystemEventArgs arg)
         {
-            if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created)
+            try
             {
-                var changedPath = Path.GetDirectoryName(arg.FullPath);
-                lock (_activeDirSync)
+                if (!arg.FullPath.Contains(".git"))
                 {
-                    if (_activeDirSync.Contains(changedPath))
-                        return;
-                    else
-                        _activeDirSync.Add(changedPath);
-                }
-                while (!IsFileReady(arg.FullPath))
-                    Thread.Sleep(50);
+                    if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created)
+                    {
+                        var changedPath = Path.GetDirectoryName(arg.FullPath);
+                        lock (_activeDirSync)
+                        {
+                            if (_activeDirSync.Contains(changedPath))
+                                return;
+                            else
+                                _activeDirSync.Add(changedPath);
+                        }
 
-                var relativePath = _localRootDirectory == changedPath ? "" : changedPath.Substring(_localRootDirectory.Length).Replace('\\', '/');
-                var fullRemotePath = _remoteRootDirectory + relativePath;
+                        try
+                        {
+                            for (int i = 0; i < 100 && !IsFileReady(arg.FullPath); i++)
+                                Thread.Sleep(50);
 
-                //check if we're a new directory
-                if (Directory.Exists(arg.FullPath))
-                {
-                    _sftp.CreateDirectory(fullRemotePath);
-                }
+                            if (!IsFileReady(arg.FullPath))
+                            {
+                                Logger.WriteLine(10, $"synchronizing {arg.FullPath} failed with because it didnt exist on disk (deleted before fsw got to it?)");
+                                return;
+                            }
 
-                foreach (var fileInfo in (await SyncDirectoryAsync(changedPath, fullRemotePath, _searchPattern)))
-                {
-                    Logger.WriteLine(8, "synchronizing " + fileInfo.FullName);
-                }
+                            var relativePath = _localRootDirectory == changedPath ? "" : changedPath.Substring(_localRootDirectory.Length).Replace('\\', '/');
+                            var fullRemotePath = _remoteRootDirectory + relativePath;
 
-                lock (_activeDirSync)
-                {
-                    _activeDirSync.Remove(changedPath);
+                            //check if we're a new directory
+                            if (Directory.Exists(arg.FullPath))
+                            {
+                                await InitialSync(arg.FullPath, fullRemotePath);
+                            }
+                            else
+                            {
+                                var fileInfos = (await SyncDirectoryAsync(changedPath, fullRemotePath, _searchPattern));
+                                if (!fileInfos.Any(fileInfo => string.Compare(fileInfo.Name, Path.GetFileName(arg.FullPath), true) == 0))
+                                    Logger.WriteLine(10, $"synchronizing failed for {arg.FullPath}, sync was requested but the remote system had a newer version or something went wrong");
+                                else
+                                {
+                                    foreach (var fileInfo in fileInfos)
+                                    {
+                                        Logger.WriteLine(8, "synchronizing " + Path.Combine(Path.GetDirectoryName(arg.FullPath), fileInfo.Name));
+                                    }
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            lock (_activeDirSync)
+                            {
+                                _activeDirSync.Remove(changedPath);
+                            }
+                        }
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                Logger.WriteLine(10, $"synchronizing {arg.FullPath} failed with {ex}");
             }
         }
 

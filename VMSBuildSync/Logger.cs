@@ -30,12 +30,20 @@ namespace VMSBuildSync
         }
         public static void WriteLine(int level, string value)
         {
-            var timeString = DateTime.UtcNow.ToShortTimeString();
+            var timeString = DateTime.Now.ToString();
             if (_instance != null)
             {
                 if (level > _instance._logLevel)
                 {
-                    _instance._writer?.WriteLine(timeString + ": " + value);
+                    try
+                    {
+                        _instance._writer?.WriteLine(timeString + ": " + value);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(timeString + ": failed while logging");
+                    }
+
                     if (_instance._console)
                         Console.WriteLine(timeString + ": " + value);
                 }

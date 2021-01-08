@@ -21,7 +21,7 @@ namespace VMSBuildSync
         private static Encoding WindowsEncoding = Encoding.GetEncoding(1252);
         //this should only be used for files in a directory, it will not behave properly if the files are in different or sub directories
         public void MakeZipForDirectory(string zipPath, List<FileStream> files,
-            Dictionary<string, int> existingFileSizes, bool forceOverride)
+            Dictionary<string, int> existingFileSizes, Dictionary<string, DateTime> existingFileDates, bool forceOverride)
         {
             using var archive = new ZipFile();
 
@@ -32,14 +32,14 @@ namespace VMSBuildSync
                     var fileName = Path.GetFileName(file.Name);
                     var lastMatcher = FileAttributeList?.LastOrDefault(tpl => tpl.Item1.IsMatch(file.Name));
                     ZipEntry entry = null;
-                    using var reader = new StreamReader(file, Encoding.ASCII);
+                    using var reader = new StreamReader(file, WindowsEncoding, leaveOpen: true);
                     var targetFileSize = file.Length;
                     int longestLine = 0;
                     var wholeFile = reader.ReadToEnd();
 
                     if (lastMatcher.Item2.RecordType == RecordTypes.C_STREAM)
                     {
-                        targetFileSize = EncodeStreamBinary(existingFileSizes, forceOverride, archive, fileName, ref entry, wholeFile, ref longestLine);
+                        targetFileSize = EncodeStreamBinary(existingFileSizes, existingFileDates, forceOverride, archive, file.Name, ref entry, file, ref longestLine);
                     }
                     else
                     {
@@ -50,12 +50,12 @@ namespace VMSBuildSync
                             newlineSplit = "\r\n";
                         }
 
-                        var splitFile = wholeFile.Split(newlineSplit, StringSplitOptions.None);
+                        var splitFile = SplitBytes(file, newlineSplit);
 
                         if (wholeFile.Contains('\uFEFF'))
                             Logger.WriteLine(10, "BOM detected");
 
-                        if (splitFile.Length < 3 && wholeFile.Length > 512)
+                        if (splitFile.Length < 3 && wholeFile.Length > 512 && string.Compare(Path.GetExtension(fileName), ".ddf", true) != 0)
                         {
                             lastMatcher = FileAttributeList?.LastOrDefault(tpl => tpl.Item1.IsMatch("this_is_a_binary_file"));
                             Logger.WriteLine(10, $"warning: {fileName} looks like it is either binary or has wrong line endings for the platform");
@@ -66,8 +66,7 @@ namespace VMSBuildSync
                         if (lastMatcher == null || ((string.IsNullOrEmpty(lastMatcher.Item2.LineEndingOverride) ||
                             lastMatcher.Item2.LineEndingOverride == Environment.NewLine) && lastMatcher.Item2.RecordType != RecordTypes.C_VARIABLE))
                         {
-                            if (forceOverride || !(existingFileSizes.TryGetValue(fileName, out var existingSize) &&
-                                  existingSize == file.Length))
+                            if (ShouldSyncFile(existingFileSizes, existingFileDates, file.Name, (int)file.Length, forceOverride))
                             {
                                 entry = archive.AddFile(fileName);
                                 entry.CompressionLevel = CompressionLevel.Level9;
@@ -79,12 +78,11 @@ namespace VMSBuildSync
                             try
                             {
                                 var translatedFile = MakeVariableRecord(splitFile);
-                                targetFileSize = translatedFile.Length;
-                                if (forceOverride || !(existingFileSizes.TryGetValue(fileName, out var existingSize) &&
-                                      existingSize == translatedFile.Length))
+                                targetFileSize = translatedFile.Length - 2;
+                                if (ShouldSyncFile(existingFileSizes, existingFileDates, file.Name, (int)targetFileSize, forceOverride))
                                 {
                                     entry = archive.AddEntry(fileName, translatedFile);
-                                    entry.IsText = false;
+                                    entry.IsText = true;
                                     entry.CompressionLevel = CompressionLevel.Level9;
                                     entry.EmitTimesInWindowsFormatWhenSaving = false;
                                 }
@@ -93,17 +91,16 @@ namespace VMSBuildSync
                             {
                                 Logger.WriteLine(10, $"failed to encode variable record {fileName} fallback to STREAM");
                                 lastMatcher = FileAttributeList?.LastOrDefault(tpl => tpl.Item1.IsMatch("this_is_a_binary_file"));
-                                targetFileSize = EncodeStreamBinary(existingFileSizes, forceOverride, archive, fileName, ref entry, wholeFile, ref longestLine);
+                                targetFileSize = EncodeStreamBinary(existingFileSizes, existingFileDates, forceOverride, archive, file.Name, ref entry, file, ref longestLine);
                             }
                         }
                         else
                         {
-                            var translatedFile = string.Join(lastMatcher.Item2.LineEndingOverride, splitFile);
+                            var translatedFile = JoinBytes(splitFile, lastMatcher.Item2.LineEndingOverride);
                             targetFileSize = translatedFile.Length;
-                            if (forceOverride || !(existingFileSizes.TryGetValue(fileName, out var existingSize) &&
-                                  existingSize == translatedFile.Length))
+                            if (ShouldSyncFile(existingFileSizes, existingFileDates, file.Name, (int)targetFileSize, forceOverride))
                             {
-                                entry = archive.AddEntry(fileName, translatedFile, Encoding.ASCII);
+                                entry = archive.AddEntry(fileName, translatedFile);
                                 entry.CompressionLevel = CompressionLevel.Level9;
                                 entry.EmitTimesInWindowsFormatWhenSaving = false;
                             }
@@ -140,16 +137,31 @@ namespace VMSBuildSync
             archive.Save(zipPath);
         }
 
-        private static long EncodeStreamBinary(Dictionary<string, int> existingFileSizes, bool forceOverride, ZipFile archive, string fileName, ref ZipEntry entry, string wholeFile, ref int longestLine)
+        private static bool ShouldSyncFile(Dictionary<string, int> existingFileSizes, Dictionary<string, DateTime> timeStamps, string fullPath, int fileLength, bool forceOverride)
+        {
+            var fileName = Path.GetFileName(fullPath);
+            var fileTimeStamp = File.GetLastWriteTime(fullPath);
+            if (forceOverride)
+                return true;
+            if (!existingFileSizes.TryGetValue(fileName, out var existingSize) || existingSize != fileLength)
+                return true;
+            if (!timeStamps.TryGetValue(fileName, out var timeStamp) || timeStamp < fileTimeStamp)
+                return true;
+
+            return false;
+        }
+
+        private static long EncodeStreamBinary(Dictionary<string, int> existingFileSizes, Dictionary<string, DateTime> timeStamps, bool forceOverride, ZipFile archive, string fullPath, ref ZipEntry entry, Stream wholeFile, ref int longestLine)
         {
             //STREAM is for non translated binary files
             //'Max line length' is capped at 512 but still needs to be present
+            var fileName = Path.GetFileName(fullPath);
+            wholeFile.Seek(0, SeekOrigin.Begin);
             long targetFileSize = wholeFile.Length;
-            if (forceOverride || !(existingFileSizes.TryGetValue(fileName, out var existingSize) &&
-existingSize == wholeFile.Length))
+            if (ShouldSyncFile(existingFileSizes, timeStamps, fullPath, (int)wholeFile.Length, forceOverride))
             {
                 longestLine = (int)Math.Min(targetFileSize, 512l);
-                entry = archive.AddEntry(fileName, wholeFile, Encoding.ASCII);
+                entry = archive.AddEntry(fileName, wholeFile);
                 entry.CompressionLevel = CompressionLevel.Level9;
                 entry.EmitTimesInWindowsFormatWhenSaving = false;
             }
@@ -157,21 +169,74 @@ existingSize == wholeFile.Length))
             return targetFileSize;
         }
 
-        private static MemoryStream MakeVariableRecord(string[] input)
+
+        static byte[][] SplitBytes(FileStream source, string seperator)
+        {
+            source.Seek(0, SeekOrigin.Begin);
+            var sepBytes = WindowsEncoding.GetBytes(seperator);
+            var sourceBytes = new byte[source.Length];
+            source.Read(sourceBytes);
+            return SplitBytes(sourceBytes, sepBytes);
+        }
+
+        public static byte[][] SplitBytes(byte[] source, byte[] separator)
+        {
+            var Parts = new List<byte[]>();
+            var Index = 0;
+            byte[] Part;
+            for (var I = 0; I < source.Length; ++I)
+            {
+                if (Equals(source, separator, I))
+                {
+                    Part = new byte[I - Index];
+                    Array.Copy(source, Index, Part, 0, Part.Length);
+                    Parts.Add(Part);
+                    Index = I + separator.Length;
+                    I += separator.Length - 1;
+                }
+            }
+            Part = new byte[source.Length - Index];
+            Array.Copy(source, Index, Part, 0, Part.Length);
+            Parts.Add(Part);
+            return Parts.ToArray();
+        }
+
+        static bool Equals(byte[] source, byte[] separator, int index)
+        {
+            for (int i = 0; i < separator.Length; ++i)
+                if (index + i >= source.Length || source[index + i] != separator[i])
+                    return false;
+            return true;
+        }
+
+        static Stream JoinBytes(byte[][] source, string seperator)
+        {
+            var result = new MemoryStream();
+            var sepBytes = WindowsEncoding.GetBytes(seperator);
+            for(int i = 0; i < source.Length; i++)
+            {
+                var byteArray = source[i];
+                result.Write(byteArray);
+                if (i != (source.Length - 1))
+                    result.Write(sepBytes);
+            }
+            return result;
+        }
+
+        private static MemoryStream MakeVariableRecord(byte[][] input)
         {
             var result = new MemoryStream();
             for(var i = 0; i < input.Length; i++)
             {
                 var line = input[i];
-                var lineBytes = WindowsEncoding.GetBytes(line);
-                short lineLength = checked((short)(lineBytes.Length));
+                short lineLength = checked((short)(line.Length));
                 if(lineLength == 0 && i == (input.Length - 1))
                 {
                     break;
                 }
                 result.Write(BitConverter.GetBytes(lineLength));
-                result.Write(lineBytes);
-                if ((lineBytes.Length % 2) == 1)
+                result.Write(line);
+                if ((line.Length % 2) == 1)
                 {
                     result.WriteByte(0);
                 }
@@ -202,7 +267,7 @@ existingSize == wholeFile.Length))
                 $"unzip \"-X\" \"-qq\" \"-o\" {VMSifyPath(rootPath)}synchTemp.zip \"-d\" {VMSifyPath(remotePath)}");
             var got = await sshExpect(newLineRegex);
             if (string.IsNullOrWhiteSpace(got))
-                Logger.WriteLine(10, $"unzip operation timed out in {remotePath}");
+                Logger.WriteLine(10, $"unzip operation timed out in {remotePath} the zip was {fileStream.Length} bytes long");
             else
                 Logger.WriteLine(1, got);
 
@@ -245,14 +310,14 @@ existingSize == wholeFile.Length))
             fixed (byte* ptr = blob)
             {
                 var nsLong = *(long*) ptr;
-                var timeStart = new DateTime(1858, 11, 17, 0, 0, 0, DateTimeKind.Utc);
+                var timeStart = new DateTime(1858, 11, 17, 0, 0, 0, DateTimeKind.Local);
                 return timeStart.AddTicks(nsLong);
             }
         }
 
         public static unsafe byte[] ConvertToSmithsonianTime(DateTime dt)
         {
-            var smithsonianTicks = dt.Ticks - 586288800000000000;
+            var smithsonianTicks = dt.ToLocalTime().Ticks - 586288800000000000;
             var result = new byte[8];
             fixed (byte* ptr = result)
             {

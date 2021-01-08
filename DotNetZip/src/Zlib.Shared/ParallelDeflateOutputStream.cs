@@ -693,7 +693,7 @@ namespace Ionic.Zlib
             if (_isClosed)
                 throw new InvalidOperationException();
 
-            if (emitting) return;
+            if (emitting || _pool == null) return;
 
             // compress any partial buffer
             if (_currentlyFilling >= 0)
