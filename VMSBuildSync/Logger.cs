@@ -39,7 +39,7 @@ namespace VMSBuildSync
                     {
                         _instance._writer?.WriteLine(timeString + ": " + value);
                     }
-                    catch (Exception ex)
+                    catch
                     {
                         Console.WriteLine(timeString + ": failed while logging");
                     }

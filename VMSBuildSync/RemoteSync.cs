@@ -324,7 +324,7 @@ namespace VMSBuildSync
                             {
                                 await CreateDirectory(_sftp, remotePath + "/" + directoryName);
                             }
-                            catch (SshException ex)
+                            catch (SshException)
                             {
                                 Logger.WriteLine(10, $"Directory {item} already exists but was reported missing");
                             }
@@ -364,7 +364,7 @@ namespace VMSBuildSync
                     sftp.Connect();
                     retrying = true;
                 }
-                catch (Renci.SshNet.Common.SshOperationTimeoutException ex)
+                catch (Renci.SshNet.Common.SshOperationTimeoutException)
                 {
                     sftp.Disconnect();
                     sftp.Connect();

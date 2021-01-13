@@ -42,6 +42,7 @@ namespace VMSBuildSync
                 }
 
                 //Attempt to parse the OCTAL UIC values into DECIMAL parts
+                Logger.WriteLine(10, $"  UIC={string.Join(' ', args)}");
                 if (!uicToDecimal(args[7], out var uicGroup, out var uicUser))
                 {
                     Logger.WriteLine(10, $"Failed to parse UIC! Must be in [x,y] format where x and y are positive octal numbers.");
