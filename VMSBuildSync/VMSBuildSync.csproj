@@ -6,6 +6,20 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+      <NoWarn>1701;1702;0618;1998</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <None Remove="exclusions.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="exclusions.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
     <ItemGroup>
       <ProjectReference Include="..\SSH.NET\src\Renci.SshNet\Renci.SshNet.csproj" />
     </ItemGroup>

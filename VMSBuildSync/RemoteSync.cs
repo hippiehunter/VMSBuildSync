@@ -12,6 +12,7 @@ using System.Text;
 using System.Threading.Tasks;
  using Renci.SshNet.Common;
 using System.Diagnostics;
+using System.Text.Json;
 
 namespace VMSBuildSync
 {
@@ -33,6 +34,8 @@ namespace VMSBuildSync
         HashSet<string> _activeDirSync = new HashSet<string>();
         private static Regex newLineRegex = new Regex(@"\w*\$\s*$");
         public static int SSHTimeout = 480;
+        bool exclFile = false;
+        Exclusions excl = new Exclusions();
         //remote attribute mapper supplies Regex's in a similar manor to .gitattributes
         //if the regex matches we apply the value (int) as the ExternalFileSystem attribute inside the zip archive
         //this allows us to effectively control readonly, executable, filetype, permissions
@@ -75,6 +78,10 @@ namespace VMSBuildSync
                 _fsw.Error += _fsw_Error;
                 _fsw.EnableRaisingEvents = true;
             });
+
+            //Reading in exlusions from exclusions.json file
+            string readExclusions = File.ReadAllText(@"exclusions.json"); //both windows (alt) and linux use / as separator
+            excl = JsonSerializer.Deserialize<Exclusions>(readExclusions);
         }
 
         private void _fsw_Error(object sender, ErrorEventArgs e)
@@ -127,14 +134,30 @@ namespace VMSBuildSync
                 var sourceListing = Directory.EnumerateFiles(sourcePath, searchPattern, SearchOption.TopDirectoryOnly);
                 var fileStreamList = new Dictionary<string, FileStream>(StringComparer.OrdinalIgnoreCase);
                 string tempFileName = string.Empty;
+
                 try
                 {
                     foreach (var localFile in sourceListing)
                     {
+                        exclFile = false;
+
                         //skip hidden files
                         if (localFile.StartsWith("."))
                             continue;
 
+                        //skip excluded file types
+                        foreach (var item in excl.ftypes)
+                        {
+                            if (localFile.EndsWith(item))
+                            {
+                                exclFile = true;
+                                break;
+                            }
+                        }
+
+                        if (exclFile)
+                            continue;
+                        
                         Logger.WriteLine(1, localFile);
 
                         var localStream = new FileStream(localFile, FileMode.Open, FileAccess.Read, FileShare.Read,
@@ -317,6 +340,10 @@ namespace VMSBuildSync
                     var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
                     if (!directoryName.Contains("."))
                     {
+                        //Excluding directory if it is in the list
+                        if (excl.directories.Contains(directoryName))
+                            continue;
+
                         if (!remoteDirectories.ContainsKey(directoryName))
                         {
                             Logger.WriteLine(2, $"Directory {localPath + Path.DirectorySeparatorChar + directoryName} is being created at {remotePath + " / " + directoryName}");

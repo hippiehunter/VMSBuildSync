@@ -160,7 +160,7 @@ namespace VMSBuildSync
             long targetFileSize = wholeFile.Length;
             if (ShouldSyncFile(existingFileSizes, timeStamps, fullPath, (int)wholeFile.Length, forceOverride))
             {
-                longestLine = (int)Math.Min(targetFileSize, 512l);
+                longestLine = (int)Math.Min(targetFileSize, 512L);
                 entry = archive.AddEntry(fileName, wholeFile);
                 entry.CompressionLevel = CompressionLevel.Level9;
                 entry.EmitTimesInWindowsFormatWhenSaving = false;
