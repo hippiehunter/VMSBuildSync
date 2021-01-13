@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "VMSBuildSync": {
+      "commandName": "Project",
+      "commandLineArgs": "siaxp1 vmssynctest secret D:\\VMSBuildSyncTest\\SOURCE /DKA0/USER/VMSBUILDSYNC/SOURCE * false [200,200]"
+    }
+  }
+}
