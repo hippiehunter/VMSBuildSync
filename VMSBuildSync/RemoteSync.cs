@@ -148,7 +148,7 @@ namespace VMSBuildSync
                         //skip excluded file types
                         foreach (var item in excl.ftypes)
                         {
-                            if (localFile.EndsWith(item))
+                            if (localFile.ToLower().EndsWith(item.ToLower()))
                             {
                                 exclFile = true;
                                 break;
