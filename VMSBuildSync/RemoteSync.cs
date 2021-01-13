@@ -36,6 +36,7 @@ namespace VMSBuildSync
         public static int SSHTimeout = 480;
         bool exclFile = false;
         Exclusions excl = new Exclusions();
+
         //remote attribute mapper supplies Regex's in a similar manor to .gitattributes
         //if the regex matches we apply the value (int) as the ExternalFileSystem attribute inside the zip archive
         //this allows us to effectively control readonly, executable, filetype, permissions
@@ -79,16 +80,19 @@ namespace VMSBuildSync
                 _fsw.EnableRaisingEvents = true;
             });
 
-            //Reading in exlusions from exclusions.json file
-            string readExclusions = File.ReadAllText(@"exclusions.json"); //both windows (alt) and linux use / as separator
-            excl = JsonSerializer.Deserialize<Exclusions>(readExclusions);
-
-            //Lower case all the file extensions
-            if (excl.ftypes.Count<string>() > 0)
+            //If we have an exclusions.json file, load it
+            if (File.Exists("exclusions.json"))
             {
-                for (int ix = 0; ix < excl.ftypes.Count<string>() -1; ix++)
+                string readExclusions = File.ReadAllText(@"exclusions.json"); //both windows (alt) and linux use / as separator
+                excl = JsonSerializer.Deserialize<Exclusions>(readExclusions);
+
+                //Lower case all the file extensions
+                if (excl.ftypes.Count<string>() > 0)
                 {
-                    excl.ftypes[ix] = excl.ftypes[ix].ToLower();
+                    for (int ix = 0; ix < excl.ftypes.Count<string>() - 1; ix++)
+                    {
+                        excl.ftypes[ix] = excl.ftypes[ix].ToLower();
+                    }
                 }
             }
         }
