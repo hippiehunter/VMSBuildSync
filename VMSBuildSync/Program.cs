@@ -26,7 +26,7 @@ namespace VMSBuildSync
         {
             if (args.Length < 8)
             {
-                Console.WriteLine("\nusage: vmsbuildsync <host> <username> <password> <localRootDir> <remoteRootDir> <searchPattern> <forceupdate> <vmsUIC> [<logfile> [<loglevel>]]");
+                Console.WriteLine("\nUsage: vmsbuildsync <host> <username> <password> <localRootDir> <remoteRootDir> <searchPattern> <forceupdate> <vmsUIC> [<logfile> [<loglevel>]]");
                 Console.WriteLine("\n\n    File types or folders can be excluded via a JSON file named exclusions.json in the current folder:\n");
                 Console.WriteLine("    {");
                 Console.WriteLine("      \"ftypes\": [");
@@ -55,7 +55,7 @@ namespace VMSBuildSync
                 //Attempt to parse the OCTAL UIC values into DECIMAL parts
                 if (!uicToDecimal(args[7], out var uicGroup, out var uicUser))
                 {
-                    Logger.WriteLine(10, $"Failed to parse UIC! Must be in [x,y] format where x and y are positive octal numbers.");
+                    Logger.WriteLine(10, $"Failed to parse UIC {args[7]}");
                 }
                 else
                 {
@@ -133,7 +133,10 @@ namespace VMSBuildSync
                     //var zipContents = new StreamReader(zippy.ReadStream).ReadToEnd();
                     //zippy.ExtractAll(@"C:\Users\hippi\RiderProjects\VMSBuildSync\jeffzip");
 
-                    Logger.WriteLine(10, $"startup event({Process.GetCurrentProcess().Id}), args were {string.Join(' ', args)}");
+                    var tmpArgs = args;
+                    tmpArgs[2] = "***";
+
+                    Logger.WriteLine(10, $"Startup event (process {Process.GetCurrentProcess().Id}), args were {string.Join(' ', tmpArgs)}");
 
                     TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
                     using (var remoteSync = new RemoteSync(args[0], args[1], args[2], args[3], args[4], args[5], regexs, args[6], tcs))
@@ -153,7 +156,7 @@ namespace VMSBuildSync
                         await tcs.Task;
                     }
 
-                    Logger.WriteLine(10, $"shutdown event({Process.GetCurrentProcess().Id})");
+                    Logger.WriteLine(10, $"Shutdown event({Process.GetCurrentProcess().Id})");
                 }
             }
         }

@@ -94,7 +94,7 @@ namespace VMSBuildSync
                         excl.ftypes[ix] = excl.ftypes[ix].ToLower();
                     }
                 }
-                Logger.WriteLine(10, $"file and folder exclusions were loaded from exclusions.json");
+                Logger.WriteLine(10, $"file and folder exclusions loaded from exclusions.json");
             }
         }
 
