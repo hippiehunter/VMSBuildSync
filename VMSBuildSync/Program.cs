@@ -26,8 +26,19 @@ namespace VMSBuildSync
         {
             if (args.Length < 8)
             {
-                Console.WriteLine(
-                    "usage: vmsbuildsync <host> <username> <password> <localRootDir> <remoteRootDir> <searchPattern> <forceupdate> <vmsUIC> [<logfile> [<loglevel>]]");
+                Console.WriteLine("\nusage: vmsbuildsync <host> <username> <password> <localRootDir> <remoteRootDir> <searchPattern> <forceupdate> <vmsUIC> [<logfile> [<loglevel>]]");
+                Console.WriteLine("\n\n    File types or folders can be excluded via a JSON file named exclusions.json in the current folder:\n");
+                Console.WriteLine("    {");
+                Console.WriteLine("      \"ftypes\": [");
+                Console.WriteLine("        \".exe\",");
+                Console.WriteLine("        \".txt\"");
+                Console.WriteLine("      ],");
+                Console.WriteLine("      \"directories]\": [");
+                Console.WriteLine("        \"exe\",");
+                Console.WriteLine("        \"exludes\"");
+                Console.WriteLine("      ]");
+                Console.WriteLine("    }");
+
             }
             else
             {
