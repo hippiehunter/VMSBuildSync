@@ -35,7 +35,7 @@ namespace VMSBuildSync
         private static Regex newLineRegex = new Regex(@"\w*\$\s*$");
         public static int SSHTimeout = 480;
         bool exclFile = false;
-        Exclusions excl = new Exclusions();
+        Exclusions excl;
 
         //remote attribute mapper supplies Regex's in a similar manor to .gitattributes
         //if the regex matches we apply the value (int) as the ExternalFileSystem attribute inside the zip archive
@@ -83,18 +83,24 @@ namespace VMSBuildSync
             //If we have an exclusions.json file, load it
             if (File.Exists("exclusions.json"))
             {
-                string readExclusions = File.ReadAllText(@"exclusions.json"); //both windows (alt) and linux use / as separator
-                excl = JsonSerializer.Deserialize<Exclusions>(readExclusions);
-
-                //Lower case all the file extensions
-                if (excl.ftypes.Count<string>() > 0)
+                try
                 {
-                    for (int ix = 0; ix < excl.ftypes.Count<string>() - 1; ix++)
+                    string readExclusions = File.ReadAllText(@"exclusions.json"); //both windows (alt) and linux use / as separator
+                    excl = JsonSerializer.Deserialize<Exclusions>(readExclusions);
+                    //Lower case all the file extensions
+                    if (excl.ftypes.Count<string>() > 0)
                     {
-                        excl.ftypes[ix] = excl.ftypes[ix].ToLower();
+                        for (int ix = 0; ix < excl.ftypes.Count<string>() - 1; ix++)
+                        {
+                            excl.ftypes[ix] = excl.ftypes[ix].ToLower();
+                        }
                     }
+                    Logger.WriteLine(10, $"file and folder exclusions loaded from exclusions.json");
                 }
-                Logger.WriteLine(10, $"file and folder exclusions loaded from exclusions.json");
+                catch
+                {
+                    Logger.WriteLine(10, $"WARNING: Failed to process exclusions.json!");
+                }
             }
         }
 
@@ -159,19 +165,22 @@ namespace VMSBuildSync
                         if (localFile.StartsWith("."))
                             continue;
 
-                        //skip excluded file types
-                        foreach (var item in excl.ftypes)
+                        //Do we have exclusions
+                        if (excl != null && excl.ftypes != null && excl.ftypes.Count<string>() > 0)
                         {
-                            if (localFile.ToLower().EndsWith(item))
+                            //skip excluded file types
+                            foreach (var item in excl.ftypes)
                             {
-                                exclFile = true;
-                                break;
+                                if (localFile.ToLower().EndsWith(item))
+                                {
+                                    exclFile = true;
+                                    break;
+                                }
                             }
+                            if (exclFile)
+                                continue;
                         }
 
-                        if (exclFile)
-                            continue;
-                        
                         Logger.WriteLine(1, localFile);
 
                         var localStream = new FileStream(localFile, FileMode.Open, FileAccess.Read, FileShare.Read,
@@ -354,8 +363,8 @@ namespace VMSBuildSync
                     var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
                     if (!directoryName.Contains("."))
                     {
-                        //Excluding directory if it is in the list
-                        if (excl.directories.Contains(directoryName))
+
+                        if (excl != null && excl.directories.Count<string>() > 0 && excl.directories.Contains(directoryName))
                             continue;
 
                         if (!remoteDirectories.ContainsKey(directoryName))
