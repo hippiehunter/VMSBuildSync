@@ -82,6 +82,15 @@ namespace VMSBuildSync
             //Reading in exlusions from exclusions.json file
             string readExclusions = File.ReadAllText(@"exclusions.json"); //both windows (alt) and linux use / as separator
             excl = JsonSerializer.Deserialize<Exclusions>(readExclusions);
+
+            //Lower case all the file extensions
+            if (excl.ftypes.Count<string>() > 0)
+            {
+                for (int ix = 0; ix < excl.ftypes.Count<string>() -1; ix++)
+                {
+                    excl.ftypes[ix] = excl.ftypes[ix].ToLower();
+                }
+            }
         }
 
         private void _fsw_Error(object sender, ErrorEventArgs e)
@@ -148,7 +157,7 @@ namespace VMSBuildSync
                         //skip excluded file types
                         foreach (var item in excl.ftypes)
                         {
-                            if (localFile.ToLower().EndsWith(item.ToLower()))
+                            if (localFile.ToLower().EndsWith(item))
                             {
                                 exclFile = true;
                                 break;
