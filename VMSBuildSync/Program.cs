@@ -59,8 +59,6 @@ namespace VMSBuildSync
                 }
                 else
                 {
-                    Logger.WriteLine(10, String.Format("UIC {0} => Group {1} (decimal), User {2} (decimal).",args[7], uicGroup, uicUser));
-
                     var regexs = new List<Tuple<Regex, VMSFileConfig>>();
 
                     regexs.Add(Tuple.Create(new Regex("\\w"), VMSFileConfig.MakeVar(FileProtection.Read | FileProtection.Write | FileProtection.Delete,
