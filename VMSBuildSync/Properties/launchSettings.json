@@ -2,7 +2,7 @@
   "profiles": {
     "VMSBuildSync": {
       "commandName": "Project",
-      "commandLineArgs": "siaxp1 vmssynctest secret D:\\VMSBuildSyncTest\\SOURCE /DKA0/USER/VMSBUILDSYNC/SOURCE * false [200,200]"
+      "commandLineArgs": "vmsit.synergex.loc stevei beth5173 D:\\VMSBuildSyncTest\\SOURCE /DKA0/STEVEI/VMSBUILDSYNCTEST * false [50,660] sync.log"
     }
   }
 }

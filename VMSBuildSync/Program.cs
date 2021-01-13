@@ -133,7 +133,8 @@ namespace VMSBuildSync
                     //var zipContents = new StreamReader(zippy.ReadStream).ReadToEnd();
                     //zippy.ExtractAll(@"C:\Users\hippi\RiderProjects\VMSBuildSync\jeffzip");
 
-                    var tmpArgs = args;
+                    var tmpArgs = new string[args.Length];
+                    args.CopyTo(tmpArgs, 0);
                     tmpArgs[2] = "***";
 
                     Logger.WriteLine(10, $"Startup event (process {Process.GetCurrentProcess().Id}), args were {string.Join(' ', tmpArgs)}");
