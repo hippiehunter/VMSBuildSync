@@ -1,8 +1,7 @@
 {
   "profiles": {
     "VMSBuildSync": {
-      "commandName": "Project",
-      "commandLineArgs": "vmsit.synergex.loc stevei beth5173 D:\\VMSBuildSyncTest\\SOURCE /DKA0/STEVEI/VMSBUILDSYNCTEST * false [50,660] sync.log"
+      "commandName": "Project"
     }
   }
 }

@@ -13,6 +13,7 @@ using System.Threading.Tasks;
  using Renci.SshNet.Common;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Net.Sockets;
 
 namespace VMSBuildSync
 {
@@ -59,13 +60,16 @@ namespace VMSBuildSync
             _localRootDirectory = localRootDirectory;
             _remoteRootDirectory = remoteRootDirectory;
             _directoryZip = new DirectoryZip() { FileAttributeList = remoteAttributeMapper };
-            _client = new SshClient(host, username, password);
-            _client.Connect();
+
+            //Get the SSH connection connected
+            tryConnect(_client = new SshClient(host, username, password), true);
+
             _shellStream = _client.CreateShellStream("sych - unzip", 80, 120, 640, 480, short.MaxValue);
             _shellStream.Expect(newLineRegex, TimeSpan.FromSeconds(SSHTimeout));
-            _sftp = new SftpClient(host, username, password);
-            _sftp.OperationTimeout = TimeSpan.FromSeconds(SSHTimeout);
-            _sftp.Connect();
+
+            //Get the SFTP connection connected
+            tryConnect(_sftp = new SftpClient(host, username, password) { OperationTimeout = TimeSpan.FromSeconds(SSHTimeout) }, true);
+
             var tsk = InitialSync(_localRootDirectory, _remoteRootDirectory);
 
             tsk.ContinueWith((tmp) =>
@@ -101,6 +105,55 @@ namespace VMSBuildSync
                 {
                     Logger.WriteLine(10, $"WARNING: Failed to process exclusions.json!");
                 }
+            }
+        }
+
+        private void tryConnect(BaseClient client, bool terminateProcessOnException = false)
+        {
+            try
+            {
+                client.Connect();
+            }
+            catch (Exception ex)
+            {
+                bool gracefulFail = false;
+
+                if (ex is SocketException)
+                {
+                    Logger.WriteLine(10, "ERROR: Socket connection could not be established! Check your host name/address.");
+                    gracefulFail = true;
+                }
+                else if (ex is SshConnectionException)
+                {
+                    Logger.WriteLine(10, "ERROR: SSH session could not be established! Check SSH is enabed on the server.");
+                    gracefulFail = true;
+                }
+                else if (ex is SshAuthenticationException)
+                {
+                    Logger.WriteLine(10, "ERROR: SSH authentication failed. Check your username and password!");
+                    gracefulFail = true;
+                }
+                else if (ex is ProxyException)
+                {
+                    Logger.WriteLine(10, "ERROR: Failed to establish proxy connection!");
+                    gracefulFail = true;
+                }
+                else if (ex is SshOperationTimeoutException)
+                {
+                    Logger.WriteLine(10, "SSH connect timed out!");
+                    gracefulFail = true;
+                }
+
+                if (gracefulFail)
+                {
+                    _tcs.TrySetResult(false);
+                    if (terminateProcessOnException)
+                    {
+                        Environment.Exit(1);
+                    }
+                }
+
+                throw;
             }
         }
 
