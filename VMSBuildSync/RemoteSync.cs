@@ -127,7 +127,7 @@ namespace VMSBuildSync
 
                 if (ex is SocketException)
                 {
-                    Logger.WriteLine(10, $"ERROR: During { service } startup a Socket connection could not be established! Check your host name/address.");
+                    Logger.WriteLine(10, $"ERROR: During { service } startup a Socket connection could not be established! Check your host name/address, and that the host is running.");
                     gracefulFail = true;
                 }
                 else if (ex is SshConnectionException)
