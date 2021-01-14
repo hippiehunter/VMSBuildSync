@@ -67,7 +67,7 @@ namespace VMSBuildSync
             _directoryZip = new DirectoryZip() { FileAttributeList = remoteAttributeMapper };
 
             //Get the SSH connection connected
-            tryConnect(_client = new SshClient(host, username, password), true);
+            tryConnect("SSH", _client = new SshClient(host, username, password), true);
 
             //Get a ShellStream that is used to send commands to and receive responses from the remote shell.
             _shellStream = _client.CreateShellStream("sych - unzip", 80, 120, 640, 480, short.MaxValue);
@@ -75,7 +75,7 @@ namespace VMSBuildSync
             _shellStream.Expect(newLineRegex, TimeSpan.FromSeconds(SSHTimeout));
 
             //Get the SFTP connection connected
-            tryConnect(_sftp = new SftpClient(host, username, password) { OperationTimeout = TimeSpan.FromSeconds(SSHTimeout) }, true);
+            tryConnect("SFTP", _sftp = new SftpClient(host, username, password) { OperationTimeout = TimeSpan.FromSeconds(SSHTimeout) }, true);
 
             var tsk = InitialSync(_localRootDirectory, _remoteRootDirectory);
 
@@ -115,7 +115,7 @@ namespace VMSBuildSync
             }
         }
 
-        private void tryConnect(BaseClient client, bool terminateProcessOnException = false)
+        private void tryConnect(string service, BaseClient client, bool terminateProcessOnException = false)
         {
             try
             {
@@ -127,27 +127,27 @@ namespace VMSBuildSync
 
                 if (ex is SocketException)
                 {
-                    Logger.WriteLine(10, "ERROR: Socket connection could not be established! Check your host name/address.");
+                    Logger.WriteLine(10, $"ERROR: During { service } startup a Socket connection could not be established! Check your host name/address.");
                     gracefulFail = true;
                 }
                 else if (ex is SshConnectionException)
                 {
-                    Logger.WriteLine(10, "ERROR: SSH session could not be established! Check SSH is enabed on the server.");
+                    Logger.WriteLine(10, $"ERROR: During { service } startup an SSH session could not be established! Check SSH is enabed on the server.");
                     gracefulFail = true;
                 }
                 else if (ex is SshAuthenticationException)
                 {
-                    Logger.WriteLine(10, "ERROR: SSH authentication failed. Check your username and password!");
+                    Logger.WriteLine(10, $"ERROR: During { service } startup SSH authentication failed. Check your username and password!");
                     gracefulFail = true;
                 }
                 else if (ex is ProxyException)
                 {
-                    Logger.WriteLine(10, "ERROR: Failed to establish proxy connection!");
+                    Logger.WriteLine(10, $"ERROR: During { service } startup a proxy connection could not be established!");
                     gracefulFail = true;
                 }
                 else if (ex is SshOperationTimeoutException)
                 {
-                    Logger.WriteLine(10, "SSH connect timed out!");
+                    Logger.WriteLine(10, $"SSH During { service } startup the connection timed out!");
                     gracefulFail = true;
                 }
 
