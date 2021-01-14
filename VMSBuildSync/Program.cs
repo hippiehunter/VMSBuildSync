@@ -14,14 +14,6 @@ namespace VMSBuildSync
 {
     class Program
     {
-        public static string ByteArrayToString(byte[] ba)
-        {
-            StringBuilder hex = new StringBuilder(ba.Length * 2);
-            foreach (byte b in ba)
-                hex.AppendFormat("{0:x2}", b);
-            return hex.ToString();
-        }
-
         static async Task Main(string[] args)
         {
             if (args.Length < 8)
@@ -42,6 +34,13 @@ namespace VMSBuildSync
             }
             else
             {
+                //Transform VMS path into UNIX path
+                if (args[4].Contains(":[") && args[4].Contains("]"))
+                {
+                    args[4] = UNIXifyPath(args[4]);
+                }
+
+                //Log file and logging level
                 if (args.Length > 8)
                 {
                     //log everything
@@ -204,6 +203,19 @@ namespace VMSBuildSync
             }
 
             return Convert.ToUInt32(decnum);
+        }
+
+        private static string UNIXifyPath(string vmsPath)
+        {
+            return String.Format("/{0}",vmsPath.Trim().Replace(":[","/").Replace(".","/").Replace("]",""));
+        }
+
+        public static string ByteArrayToString(byte[] ba)
+        {
+            StringBuilder hex = new StringBuilder(ba.Length * 2);
+            foreach (byte b in ba)
+                hex.AppendFormat("{0:x2}", b);
+            return hex.ToString();
         }
     }
 }
