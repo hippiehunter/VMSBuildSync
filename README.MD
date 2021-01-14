@@ -155,7 +155,7 @@ No access restrictions
 Expiration:            (none)    Pwdminimum:  6   Login Fails:     0
 Pwdlifetime:           (none)    Pwdchange:  13-JAN-2021 18:22
 Last Login: 14-JAN-2021 00:09 (interactive), 14-JAN-2021 00:09 (non-interactive)
-Maxjobs:         0  Fillm:      4096  **Bytlm:         32000**
+Maxjobs:         0  Fillm:      4096  Bytlm:         32000
 Maxacctjobs:     0  Shrfillm:      0  Pbytlm:            0
 Maxdetach:       0  BIOlm:       150  JTquota:        4096
 Prclm:          10  DIOlm:       150  WSdef:          4096
