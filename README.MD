@@ -22,10 +22,9 @@ The following conditions MUST be met for VMSBuildSync to work:
 * NOT have secondary passwords enabled
 
 * NOT have a "system password" enabled for developer accounts.
-  * This does not refer to the password on the SYSTEM user account, a system password is
-    something else, requiring users to type a password when first connecting, there is no
-	prompt. They have to know to enter the system password to then be subsequently
-	prompted for a username.
+  * This does not refer to the password on the SYSTEM user account, a system password is something else, requiring users to type a password when first connecting. There is no prompt to do so, the user has to know to enter the system password. Once the system password is entered the user is presented with the normal login experience.
+
+* NOT have spaces or special characters in file or folder names, other than $ and _ which are supported.
 
 ## Recommendations
 
@@ -57,3 +56,33 @@ guidelines for the OpenVMS developer accounts:
 ```
   UAF> MOD <user>/FLAG=(DISMAIL,DISREPORT,DISWELCOME)
 ```
+
+## Running VMSBuildSync
+
+VMSBuildSync is a .NET Core console application and is started like this:
+```
+vmsbuildsync <host> <username> <password> <localRootDir> <remoteRootDir> <searchPattern> <forceupdate> <vmsUIC> [<logfile> [<loglevel>]]
+```
+
+* `host` is the DNS name or TCP/IP address of the OpenVMS host to connect to.
+* `username` is the username of the account to log in to on the OpenVMS system.
+* `password` is the password for the user account.
+* `localRootDir` is a the Windows path to the root of the directory heirarchy to be synchronized to OpenVMS.
+* `remoteRootDir` is the OpenVMS directory specification of the root directory where the windows files and folders are to be synchromized to.
+* `searchPatttern is a wildcard pattern describing the files to be copied. Typically * is passed to signify all files.`
+* `forceUpdate` ????
+* `vmsUIC` is the OpenVMS user identification code that synchronized files should be owned by. Typically this should be the same as the UIC of the user account being used.
+
+### Finding the account UIC
+
+You can display the UIC of the user account by logging in to the account and typing the following command at the DCL prompt:
+
+```
+$ write sys$output f$getjpi("","UIC")
+```
+If the UIC is displayed in a numeric format like `[200,1]` then you are done. If howevewr the UIC is displayed in an alphanumeric format, such as `[GLUSERS]` then yoo will need to run one more command, including the name from the UIC (GLUSERS in this example):
+
+```
+$ write sys$output f$fao("!%U",f$identifier("GLUSERS","NAME_TO_NUMBER"))
+```
+And this command should display the UIC in the numeric form that you need to pass to VMSBuildSync.
