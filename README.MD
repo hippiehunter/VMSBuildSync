@@ -141,37 +141,43 @@ Then the problem is that the SSH service is exceeding the byte limit quota (BYTL
 but by how much. My general guideline is to double the existing value, which you can determine by using the AUTHORIZE utility:
 
 ```
-UAF> SHOW JODAH_
+UAF> SHOW TCPIP$SSH
 
-Username: JODAH_                           Owner:  Jodah Veloper
-Account:                                   UIC:    [200,1] ([STEVEI])
+Username: TCPIP$SSH                        Owner:  TCPIP$SSH
+Account:  TCPIP                            UIC:    [3655,5] ([TCPIP$AUX,TCPIP$SSH])
 CLI:      DCL                              Tables: DCLTABLES
-Default:  DKA0:[USER.JODAH]
-LGICMD:   LOGIN.COM
-Flags:
+Default:  TCPIP$SSH_DEVICE:[TCPIP$SSH]
+LGICMD:   LOGIN
+Flags:  Restricted
 Primary days:   Mon Tue Wed Thu Fri
 Secondary days:                     Sat Sun
-No access restrictions
+Primary   000000000011111111112222  Secondary 000000000011111111112222
+Day Hours 012345678901234567890123  Day Hours 012345678901234567890123
+Network:  ##### Full access ######            ##### Full access ######
+Batch:    -----  No access  ------            -----  No access  ------
+Local:    -----  No access  ------            -----  No access  ------
+Dialup:   -----  No access  ------            -----  No access  ------
+Remote:   -----  No access  ------            -----  No access  ------
 Expiration:            (none)    Pwdminimum:  6   Login Fails:     0
-Pwdlifetime:           (none)    Pwdchange:  13-JAN-2021 18:22
-Last Login: 14-JAN-2021 00:09 (interactive), 14-JAN-2021 00:09 (non-interactive)
-Maxjobs:         0  Fillm:      4096  Bytlm:         32000
+Pwdlifetime:           (none)    Pwdchange:      (pre-expired)
+Last Login:            (none) (interactive), 14-JAN-2021 00:09 (non-interactive)
+Maxjobs:         0  Fillm:       100  Bytlm:         32000
 Maxacctjobs:     0  Shrfillm:      0  Pbytlm:            0
-Maxdetach:       0  BIOlm:       150  JTquota:        4096
-Prclm:          10  DIOlm:       150  WSdef:          4096
-Prio:            4  ASTlm:       300  WSquo:         16384
-Queprio:         4  TQElm:       100  WSextent:      32768
-CPU:        (none)  Enqlm:      4000  Pgflquo:     2100000
+Maxdetach:       0  BIOlm:       400  JTquota:        4096
+Prclm:           8  DIOlm:        50  WSdef:           350
+Prio:            8  ASTlm:       100  WSquo:          1024
+Queprio:         4  TQElm:        50  WSextent:       4000
+CPU:        (none)  Enqlm:       100  Pgflquo:       50000
 Authorized Privileges:
-  MOUNT        NETMBX       TMPMBX       VOLPRO
+  NETMBX       TMPMBX
 Default Privileges:
-  MOUNT        NETMBX       TMPMBX       VOLPRO
+  NETMBX       TMPMBX
 ```
 
 Look for the numeric value next to `Bytlm`, then set a new value like this:
 
 ```
-UAF> MOD JODAH_/BYTLM=64000
+UAF> MOD TCPIP$SSH/BYTLM=64000
 ```
 
 After doing this you may need to shut down and restart the SSH service. Don't do this if users are connected to the system via SSH! 
