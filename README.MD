@@ -61,7 +61,7 @@ guidelines for the OpenVMS developer accounts:
 
 VMSBuildSync is a .NET Core console application and is started like this:
 ```
-vmsbuildsync <host> <user> <password> <localRoot> <remoteRoot> <pattern> <forceUpdate> <uic> [<logFile> [<logLevel>]]
+  vmsbuildsync <host> <user> <pwd> <localRoot> <remoteRoot> <pattern> <forceUpdate> <uic> [<logFile> [<logLevel>]]
 ```
 
 * `host` is the DNS name or TCP/IP address of the OpenVMS host to connect to.
@@ -80,12 +80,12 @@ vmsbuildsync <host> <user> <password> <localRoot> <remoteRoot> <pattern> <forceU
 You can display the UIC of the user account by logging in to the account and typing the following command at the DCL prompt:
 
 ```
-$ write sys$output f$getjpi("","UIC")
+  $ write sys$output f$getjpi("","UIC")
 ```
-If the UIC is displayed in a numeric format like `[200,1]` then you are done. If howevewr the UIC is displayed in an alphanumeric format, such as `[GLUSERS]` then yoo will need to run one more command, including the name from the UIC (GLUSERS in this example):
+If the UIC is displayed in a numeric format like `[200,1]` then you are done. But if the UIC is displayed in alphanumeric format (e.g. `[GLUSERS]`) then you must run another DCL command, including the name from the UIC (GLUSERS in this example):
 
 ```
-$ write sys$output f$fao("!%U",f$identifier("GLUSERS","NAME_TO_NUMBER"))
+  $ write sys$output f$fao("!%U",f$identifier("GLUSERS","NAME_TO_NUMBER"))
 ```
 And this command should display the UIC in the numeric form that you need to pass to VMSBuildSync.
 
