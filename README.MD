@@ -69,7 +69,7 @@ vmsbuildsync <host> <user> <password> <localRoot> <remoteRoot> <pattern> <forceU
 * `password` is the password for the user account.
 * `localRoot` is a the Windows path to the root of the directory heirarchy to be synchronized to OpenVMS.
 * `remoteRoot` is the OpenVMS device and directory specification of the root directory where the windows files and folders should be synchromized.
-* `search is a wildcard pattern describing the files to be copied. Typically * is passed to signify all files.`
+* `search` is a wildcard pattern describing the files to be copied. Typically * is passed to signify all files.
 * `forceUpdate` ????
 * `uic` is the OpenVMS user identification code that synchronized files should be owned by. Typically this should be the same as the UIC of the user account being used.
 * `logFile` is the name or path of a log file to be created on the windows system. If only a file name is specified then the file will be cretated in the current folder, or a full or relative path may be specified.
