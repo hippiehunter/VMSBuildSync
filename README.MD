@@ -1,6 +1,10 @@
 
 # VMSBuildSync
 
+VMSBuildSync is a software development tool that can help OpenVMS developers to configure an environment where they can develop and maintain their source code on a Windows system, and have that code mirrored to their OpenVMS environment, in real time, as they work on the code.
+
+The tool implements a file system watcher that monitors a directory tree on Windows. When you first start the tool it synchronizes the files and folders that are in the local directory tree on Windows with an identified directory tree on the OpenVMS system. After that, as files and folders change on the Windows system, those changes are synchrnized to the OpennVMS system in real time.
+
 ## Requirements
 
 The following conditions MUST be met for VMSBuildSync to work:
