@@ -39,12 +39,12 @@ guidelines for the OpenVMS developer accounts:
   or something similar, bearing in mind that you are dealing with a 12-character maximum
   for usernames!
 
-* In SYLOGIN.COM and LOGIN.COM detect username ending with "_" and immediately exit.
+* In SYLOGIN.COM and LOGIN.COM detect username ending with "\_" and immediately exit.
   BUT, the process MUST have an UNZIP symbol that points to Info-Zip 6. This can be achieved
-  (for accounts ending "_") by putting this DBL code at the top of each of those files:
+  (for accounts ending "\_") by putting this DBL code at the top of each of those files:
 
 ```
-  $ if f$extract(f$length(f$edit(f$getjpi("","USERNAME"),"COLLAPSE"))-1,1,f$getjpi("","USERNAME")).eqs."_"
+  $ if f$extract(f$length(f$edit(f$getjpi("","USERNAME"),"COLLAPSE"))-1,1,f$getjpi("","USERNAME")).eqs."\_"
   $ then
   $     unzip:==$unzip.exe
   $     exit
