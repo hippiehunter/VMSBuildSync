@@ -35,7 +35,7 @@ guidelines for the OpenVMS developer accounts:
 * Minimize any text displayed before login, and between login and the $ prompt being displayed.
 
 * Have a additional developer accounts specifically for file sync that minimize the
-  commands issued during login. Base the name on the developers login, suffixed by "_",
+  commands issued during login. Base the name on the developers login, suffixed by "\_",
   or something similar, bearing in mind that you are dealing with a 12-character maximum
   for usernames!
 
