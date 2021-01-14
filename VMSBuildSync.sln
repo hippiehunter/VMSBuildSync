@@ -16,6 +16,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.MD = README.MD
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "reference", "reference", "{036F8583-E920-4FC7-9AC6-97BF46A16042}"
+	ProjectSection(SolutionItems) = preProject
+		reference\HPE_c04622264_HP TCP_IP Services for OpenVMS Guide to SSH - July 2006.pdf = reference\HPE_c04622264_HP TCP_IP Services for OpenVMS Guide to SSH - July 2006.pdf
+		reference\HPE_c04623347_HP TCP_IP Services V5.7 for OpenVMS Release Notes - March 2010.pdf = reference\HPE_c04623347_HP TCP_IP Services V5.7 for OpenVMS Release Notes - March 2010.pdf
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		DotNetZip\src\Zip.Shared\Zip.Shared.projitems*{1b9683db-800b-46ce-a8a6-2d30ff320aaf}*SharedItemsImports = 5
