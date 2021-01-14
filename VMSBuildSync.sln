@@ -11,6 +11,11 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Zip.Shared", "DotNetZip\src
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Zlib.Shared", "DotNetZip\src\Zlib.Shared\Zlib.Shared.shproj", "{C6B960DA-45D1-4D38-8697-05C0BA439503}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{00715D84-F9CF-44AE-ABAD-E7B2EF7C9CF0}"
+	ProjectSection(SolutionItems) = preProject
+		README.MD = README.MD
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		DotNetZip\src\Zip.Shared\Zip.Shared.projitems*{1b9683db-800b-46ce-a8a6-2d30ff320aaf}*SharedItemsImports = 5

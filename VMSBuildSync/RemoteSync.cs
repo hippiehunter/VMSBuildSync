@@ -38,6 +38,11 @@ namespace VMSBuildSync
         bool exclFile = false;
         Exclusions excl;
 
+
+        //  \w*\$\s*$
+        //Any number of word (alphanumeric) characters
+
+
         //remote attribute mapper supplies Regex's in a similar manor to .gitattributes
         //if the regex matches we apply the value (int) as the ExternalFileSystem attribute inside the zip archive
         //this allows us to effectively control readonly, executable, filetype, permissions
@@ -64,7 +69,9 @@ namespace VMSBuildSync
             //Get the SSH connection connected
             tryConnect(_client = new SshClient(host, username, password), true);
 
+            //Get a ShellStream that is used to send commands to and receive responses from the remote shell.
             _shellStream = _client.CreateShellStream("sych - unzip", 80, 120, 640, 480, short.MaxValue);
+            //TODO: Why does this take 20 seconds to complete?
             _shellStream.Expect(newLineRegex, TimeSpan.FromSeconds(SSHTimeout));
 
             //Get the SFTP connection connected
