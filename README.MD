@@ -61,20 +61,19 @@ guidelines for the OpenVMS developer accounts:
 
 VMSBuildSync is a .NET Core console application and is started like this:
 ```
-vmsbuildsync <host> <username> <password> <localRootDir> <remoteRootDir> <searchPattern> <forceupdate> <vmsUIC> [<logfile> [<
->]]
+vmsbuildsync <host> <user> <password> <localRoot> <remoteRoot> <pattern> <forceUpdate> <uic> [<logFile> [<logLevel>]]
 ```
 
 * `host` is the DNS name or TCP/IP address of the OpenVMS host to connect to.
-* `username` is the username of the account to log in to on the OpenVMS system.
+* `user` is the username of the account to log in to on the OpenVMS system.
 * `password` is the password for the user account.
-* `localRootDir` is a the Windows path to the root of the directory heirarchy to be synchronized to OpenVMS.
-* `remoteRootDir` is the OpenVMS device and directory specification of the root directory where the windows files and folders should be synchromized.
-* `searchPatttern is a wildcard pattern describing the files to be copied. Typically * is passed to signify all files.`
+* `localRoot` is a the Windows path to the root of the directory heirarchy to be synchronized to OpenVMS.
+* `remoteRoot` is the OpenVMS device and directory specification of the root directory where the windows files and folders should be synchromized.
+* `search is a wildcard pattern describing the files to be copied. Typically * is passed to signify all files.`
 * `forceUpdate` ????
-* `vmsUIC` is the OpenVMS user identification code that synchronized files should be owned by. Typically this should be the same as the UIC of the user account being used.
-* `logfile` is the name or path of a log file to be created on the windows system. If only a file name is specified then the file will be cretated in the current folder, or a full or relative path may be specified.
-* `loglevel` is the logging level to use. Various logging levels are used, including 1, 2, 8 and 10. The higher the logging level the more verbose the output. A log level of -1 means log to the console window.
+* `uic` is the OpenVMS user identification code that synchronized files should be owned by. Typically this should be the same as the UIC of the user account being used.
+* `logFile` is the name or path of a log file to be created on the windows system. If only a file name is specified then the file will be cretated in the current folder, or a full or relative path may be specified.
+* `logLevel` is the logging level to use. Various logging levels are used, including 1, 2, 8 and 10. The higher the logging level the more verbose the output. A log level of -1 means log to the console window.
 
 ### Finding the account UIC
 

@@ -18,7 +18,7 @@ namespace VMSBuildSync
         {
             if (args.Length < 8)
             {
-                Console.WriteLine("\nUsage: vmsbuildsync <host> <username> <password> <localRootDir> <remoteRootDir> <searchPattern> <forceupdate> <vmsUIC> [<logfile> [<loglevel>]]");
+                Console.WriteLine("\nUsage: vmsbuildsync <host> <username> <password> <localRoot> <remoteRoot> <pattern> <forceUpdate> <uic> [<logFile> [<logLevel>]]");
                 Console.WriteLine("\n\n    File types or folders can be excluded via a JSON file named exclusions.json in the current folder:\n");
                 Console.WriteLine("    {");
                 Console.WriteLine("      \"ftypes\": [");
