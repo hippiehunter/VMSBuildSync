@@ -53,17 +53,7 @@ guidelines for the OpenVMS developer accounts:
 
   This example assumes that unzip.exe is in SYS$SYSTEM: but check and edit appropriately.
 
-* Disable mail delivery to the account:
+* Disable mail delivery, last login messages and the welcome message for accounbts used for sync:
 ```
-  UAF> MOD <user>/FLAG=DISMAIL
-```
-
-* Suppresses reports of the last login time, login failures, and other security reports:
-```
-  UAF> MOD <user>/FLAG=DISREPORT
-```
-
-* Suppresses the welcome message:
-```
-  UAF> MOD <user>/FLAG=DISWELCOME
+  UAF> MOD <user>/FLAG=(DISMAIL,DISREPORT,DISWELCOME)
 ```
