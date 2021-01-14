@@ -44,7 +44,7 @@ guidelines for the OpenVMS developer accounts:
   (for accounts ending "\_") by putting this DBL code at the top of each of those files:
 
 ```
-  $ if f$extract(f$length(f$edit(f$getjpi("","USERNAME"),"COLLAPSE"))-1,1,f$getjpi("","USERNAME")).eqs."\_"
+  $ if f$extract(f$length(f$edit(f$getjpi("","USERNAME"),"COLLAPSE"))-1,1,f$getjpi("","USERNAME")).eqs."_"
   $ then
   $     unzip:==$unzip.exe
   $     exit
