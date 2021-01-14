@@ -97,3 +97,19 @@ This is an example command line that micht be used to start VMSBuildSync:
 ```
 vmsbuildsync devaxp jodah_ dbldev C:\MYAPP\SOURCE DKA0:[USER.JODAH.MYAPP.SOURCE] * false [200,1]
 ```
+## Excluding Files and Folders
+
+You can exclude file extensions and even entire folders from the synchronization process by creating a JSON file named `exclusions.json` in the currentl directory where you run VMSBuildSync from:
+
+```
+  {
+    "ftypes": [
+      ".exe",
+      ".txt"
+    ],
+      "directories": [
+      "exe",
+      "exludes"
+    ]
+  }
+```
