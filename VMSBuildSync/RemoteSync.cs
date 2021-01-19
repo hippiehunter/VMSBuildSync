@@ -12,6 +12,7 @@ using System.Text;
 using System.Threading.Tasks;
  using Renci.SshNet.Common;
 using System.Diagnostics;
+using System.Threading.Channels;
 
 namespace VMSBuildSync
 {
@@ -32,7 +33,9 @@ namespace VMSBuildSync
         private DirectoryZip _directoryZip;
         HashSet<string> _activeDirSync = new HashSet<string>();
         private static Regex newLineRegex = new Regex(@"\w*\$\s*$");
+        public Channel<string> _fswQueue;
         public static int SSHTimeout = 480;
+        private CancellationTokenSource _cts = new CancellationTokenSource();
         //remote attribute mapper supplies Regex's in a similar manor to .gitattributes
         //if the regex matches we apply the value (int) as the ExternalFileSystem attribute inside the zip archive
         //this allows us to effectively control readonly, executable, filetype, permissions
@@ -47,7 +50,7 @@ namespace VMSBuildSync
             {
                 bool.TryParse(forceOverride, out _forceOverride);
             }
-            _tcs = tcs;
+            _tcs = tcs ?? new TaskCompletionSource<bool>();
             _host = host;
             _username = username;
             _password = password;
@@ -64,8 +67,12 @@ namespace VMSBuildSync
             _sftp.Connect();
             var tsk = InitialSync(_localRootDirectory, _remoteRootDirectory);
 
+            _tcs.Task.ContinueWith((tb) => _cts.Cancel());
+
             tsk.ContinueWith((tmp) =>
             {
+                _fswQueue = Channel.CreateUnbounded<string>();
+                Task.Run(RunBackground);
                 Logger.WriteLine(10, "initial sync completed");
                 _fsw = new FileSystemWatcher(localRootDirectory, searchPattern);
                 _fsw.InternalBufferSize = 1024 * 64;
@@ -75,6 +82,56 @@ namespace VMSBuildSync
                 _fsw.Error += _fsw_Error;
                 _fsw.EnableRaisingEvents = true;
             });
+        }
+
+         
+        private async void RunBackground()
+        {
+            var cancelToken = _cts.Token;
+            var exitTask = _tcs.Task;
+            while (!(exitTask.IsCompleted || exitTask.IsFaulted || exitTask.IsCanceled))
+            {
+                var fullPath = await _fswQueue.Reader.ReadAsync();
+                try
+                {
+                    var changedPath = Path.GetDirectoryName(fullPath);
+
+                    for (int i = 0; i < 100 && !IsFileReady(fullPath); i++)
+                        await Task.Delay(50);
+
+                    if (!IsFileReady(fullPath))
+                    {
+                        Logger.WriteLine(10, $"synchronizing {fullPath} failed with because it didnt exist on disk (deleted before fsw got to it?)");
+                        return;
+                    }
+
+                    var relativePath = _localRootDirectory == changedPath ? "" : changedPath.Substring(_localRootDirectory.Length).Replace('\\', '/');
+                    var fullRemotePath = _remoteRootDirectory + relativePath;
+
+                    //check if we're a new directory
+                    if (Directory.Exists(fullPath))
+                    {
+                        await InitialSync(fullPath, fullRemotePath);
+                    }
+                    else
+                    {
+                        var fileInfos = (await SyncDirectoryAsync(changedPath, fullRemotePath, _searchPattern));
+                        if (!fileInfos.Any(fileInfo => string.Compare(fileInfo.Name, Path.GetFileName(fullPath), true) == 0))
+                            Logger.WriteLine(10, $"synchronizing failed for {fullPath}, sync was requested but the remote system had a newer version or something went wrong");
+                        else
+                        {
+                            foreach (var fileInfo in fileInfos)
+                            {
+                                Logger.WriteLine(8, "synchronizing " + Path.Combine(Path.GetDirectoryName(fullPath), fileInfo.Name));
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.WriteLine(10, $"synchronizing {fullPath} failed with {ex}");
+                }
+            }
         }
 
         private void _fsw_Error(object sender, ErrorEventArgs e)
@@ -454,69 +511,17 @@ namespace VMSBuildSync
 
        
 
-        private async void Fsw_Changed(object sender, FileSystemEventArgs arg)
+        private void Fsw_Changed(object sender, FileSystemEventArgs arg)
         {
-            try
+            if (!arg.FullPath.Contains(".git"))
             {
-                if (!arg.FullPath.Contains(".git"))
+                if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created)
                 {
-                    if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created)
+                    if (!_fswQueue.Writer.TryWrite(arg.FullPath))
                     {
-                        var changedPath = Path.GetDirectoryName(arg.FullPath);
-                        lock (_activeDirSync)
-                        {
-                            if (_activeDirSync.Contains(changedPath))
-                                return;
-                            else
-                                _activeDirSync.Add(changedPath);
-                        }
-
-                        try
-                        {
-                            for (int i = 0; i < 100 && !IsFileReady(arg.FullPath); i++)
-                                Thread.Sleep(50);
-
-                            if (!IsFileReady(arg.FullPath))
-                            {
-                                Logger.WriteLine(10, $"synchronizing {arg.FullPath} failed with because it didnt exist on disk (deleted before fsw got to it?)");
-                                return;
-                            }
-
-                            var relativePath = _localRootDirectory == changedPath ? "" : changedPath.Substring(_localRootDirectory.Length).Replace('\\', '/');
-                            var fullRemotePath = _remoteRootDirectory + relativePath;
-
-                            //check if we're a new directory
-                            if (Directory.Exists(arg.FullPath))
-                            {
-                                await InitialSync(arg.FullPath, fullRemotePath);
-                            }
-                            else
-                            {
-                                var fileInfos = (await SyncDirectoryAsync(changedPath, fullRemotePath, _searchPattern));
-                                if (!fileInfos.Any(fileInfo => string.Compare(fileInfo.Name, Path.GetFileName(arg.FullPath), true) == 0))
-                                    Logger.WriteLine(10, $"synchronizing failed for {arg.FullPath}, sync was requested but the remote system had a newer version or something went wrong");
-                                else
-                                {
-                                    foreach (var fileInfo in fileInfos)
-                                    {
-                                        Logger.WriteLine(8, "synchronizing " + Path.Combine(Path.GetDirectoryName(arg.FullPath), fileInfo.Name));
-                                    }
-                                }
-                            }
-                        }
-                        finally
-                        {
-                            lock (_activeDirSync)
-                            {
-                                _activeDirSync.Remove(changedPath);
-                            }
-                        }
+                        Logger.WriteLine(10, $"failed to add {arg.FullPath} to the change queue");
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                Logger.WriteLine(10, $"synchronizing {arg.FullPath} failed with {ex}");
             }
         }
 
