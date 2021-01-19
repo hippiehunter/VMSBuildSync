@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "VMSBuildSync": {
+      "commandName": "Project",
+      "commandLineArgs": "vmsit.synergex.loc stevei_ password D:\\VMSBuildSyncTest\\SOURCE /DKA0/STEVEI/VMSBUILDSYNCTEST * false [50,660]"
+    }
+  }
+}

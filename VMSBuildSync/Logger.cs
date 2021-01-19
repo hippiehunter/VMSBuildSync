@@ -12,6 +12,7 @@ namespace VMSBuildSync
             _writer.Flush();
             _writer.Dispose();
         }
+
         private StreamWriter _writer;
         private int _logLevel;
         private bool _console;
@@ -19,15 +20,24 @@ namespace VMSBuildSync
 
         public static void Init(string logfileName, int level, bool console)
         {
-            _instance = new Logger
+            try
             {
-                _writer = string.IsNullOrWhiteSpace(logfileName) ? null : new StreamWriter(File.Open(logfileName, FileMode.Append, FileAccess.Write, FileShare.ReadWrite), leaveOpen: false),
-                _logLevel = level,
-                _console = console
-            };
-            if(_instance._writer != null)
-                _instance._writer.AutoFlush = true;
+                _instance = new Logger
+                {
+                    _writer = string.IsNullOrWhiteSpace(logfileName) ? null : new StreamWriter(File.Open(logfileName, FileMode.Append, FileAccess.Write, FileShare.ReadWrite), leaveOpen: false),
+                    _logLevel = level,
+                    _console = console
+                };
+                if (_instance._writer != null)
+                    _instance._writer.AutoFlush = true;
+            }
+            catch (Exception)
+            {
+                Console.WriteLine($"{DateTime.Now.ToString()}: ERROR: Failed to initialize logging. Check your log file specification!");
+                Environment.Exit(1);
+            }
         }
+
         public static void WriteLine(int level, string value)
         {
             var timeString = DateTime.Now.ToString();
@@ -39,7 +49,7 @@ namespace VMSBuildSync
                     {
                         _instance._writer?.WriteLine(timeString + ": " + value);
                     }
-                    catch (Exception ex)
+                    catch
                     {
                         Console.WriteLine(timeString + ": failed while logging");
                     }

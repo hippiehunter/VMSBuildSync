@@ -13,6 +13,8 @@ using System.Threading.Tasks;
  using Renci.SshNet.Common;
 using System.Diagnostics;
 using System.Threading.Channels;
+using System.Text.Json;
+using System.Net.Sockets;
 
 namespace VMSBuildSync
 {
@@ -36,6 +38,14 @@ namespace VMSBuildSync
         public Channel<string> _fswQueue;
         public static int SSHTimeout = 480;
         private CancellationTokenSource _cts = new CancellationTokenSource();
+        bool exclFile = false;
+        Exclusions excl;
+
+
+        //  \w*\$\s*$
+        //Any number of word (alphanumeric) characters
+
+
         //remote attribute mapper supplies Regex's in a similar manor to .gitattributes
         //if the regex matches we apply the value (int) as the ExternalFileSystem attribute inside the zip archive
         //this allows us to effectively control readonly, executable, filetype, permissions
@@ -58,13 +68,18 @@ namespace VMSBuildSync
             _localRootDirectory = localRootDirectory;
             _remoteRootDirectory = remoteRootDirectory;
             _directoryZip = new DirectoryZip() { FileAttributeList = remoteAttributeMapper };
-            _client = new SshClient(host, username, password);
-            _client.Connect();
+
+            //Get the SSH connection connected
+            tryConnect("SSH", _client = new SshClient(host, username, password), true);
+
+            //Get a ShellStream that is used to send commands to and receive responses from the remote shell.
             _shellStream = _client.CreateShellStream("sych - unzip", 80, 120, 640, 480, short.MaxValue);
+            //TODO: Why does this take 20 seconds to complete?
             _shellStream.Expect(newLineRegex, TimeSpan.FromSeconds(SSHTimeout));
-            _sftp = new SftpClient(host, username, password);
-            _sftp.OperationTimeout = TimeSpan.FromSeconds(SSHTimeout);
-            _sftp.Connect();
+
+            //Get the SFTP connection connected
+            tryConnect("SFTP", _sftp = new SftpClient(host, username, password) { OperationTimeout = TimeSpan.FromSeconds(SSHTimeout) }, true);
+
             var tsk = InitialSync(_localRootDirectory, _remoteRootDirectory);
 
             _tcs.Task.ContinueWith((tb) => _cts.Cancel());
@@ -82,6 +97,78 @@ namespace VMSBuildSync
                 _fsw.Error += _fsw_Error;
                 _fsw.EnableRaisingEvents = true;
             });
+
+            //If we have an exclusions.json file, load it
+            if (File.Exists("exclusions.json"))
+            {
+                try
+                {
+                    string readExclusions = File.ReadAllText(@"exclusions.json"); //both windows (alt) and linux use / as separator
+                    excl = JsonSerializer.Deserialize<Exclusions>(readExclusions);
+                    //Lower case all the file extensions
+                    if (excl.ftypes.Count<string>() > 0)
+                    {
+                        for (int ix = 0; ix < excl.ftypes.Count<string>() - 1; ix++)
+                        {
+                            excl.ftypes[ix] = excl.ftypes[ix].ToLower();
+                        }
+                    }
+                    Logger.WriteLine(10, $"file and folder exclusions loaded from exclusions.json");
+                }
+                catch
+                {
+                    Logger.WriteLine(10, $"WARNING: Failed to process exclusions.json!");
+                }
+            }
+        }
+
+        private void tryConnect(string service, BaseClient client, bool terminateProcessOnException = false)
+        {
+            try
+            {
+                client.Connect();
+            }
+            catch (Exception ex)
+            {
+                bool gracefulFail = false;
+
+                if (ex is SocketException)
+                {
+                    Logger.WriteLine(10, $"ERROR: During { service } startup a Socket connection could not be established! Check your host name/address, and that the host is running.");
+                    gracefulFail = true;
+                }
+                else if (ex is SshConnectionException)
+                {
+                    Logger.WriteLine(10, $"ERROR: During { service } startup an SSH session could not be established! Check SSH is enabed on the server.");
+                    gracefulFail = true;
+                }
+                else if (ex is SshAuthenticationException)
+                {
+                    Logger.WriteLine(10, $"ERROR: During { service } startup SSH authentication failed. Check your username and password!");
+                    gracefulFail = true;
+                }
+                else if (ex is ProxyException)
+                {
+                    Logger.WriteLine(10, $"ERROR: During { service } startup a proxy connection could not be established!");
+                    gracefulFail = true;
+                }
+                else if (ex is SshOperationTimeoutException)
+                {
+                    Logger.WriteLine(10, $"SSH During { service } startup the connection timed out!");
+                    gracefulFail = true;
+                }
+
+                if (gracefulFail)
+                {
+                    _tcs.TrySetResult(false);
+                    if (terminateProcessOnException)
+                    {
+                        Environment.Exit(1);
+                    }
+                }
+
+                throw;
+            }
         }
 
          
@@ -184,13 +271,32 @@ namespace VMSBuildSync
                 var sourceListing = Directory.EnumerateFiles(sourcePath, searchPattern, SearchOption.TopDirectoryOnly);
                 var fileStreamList = new Dictionary<string, FileStream>(StringComparer.OrdinalIgnoreCase);
                 string tempFileName = string.Empty;
+
                 try
                 {
                     foreach (var localFile in sourceListing)
                     {
+                        exclFile = false;
+
                         //skip hidden files
                         if (localFile.StartsWith("."))
                             continue;
+
+                        //Do we have exclusions
+                        if (excl != null && excl.ftypes != null && excl.ftypes.Count<string>() > 0)
+                        {
+                            //skip excluded file types
+                            foreach (var item in excl.ftypes)
+                            {
+                                if (localFile.ToLower().EndsWith(item))
+                                {
+                                    exclFile = true;
+                                    break;
+                                }
+                            }
+                            if (exclFile)
+                                continue;
+                        }
 
                         Logger.WriteLine(1, localFile);
 
@@ -374,6 +480,10 @@ namespace VMSBuildSync
                     var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
                     if (!directoryName.Contains("."))
                     {
+
+                        if (excl != null && excl.directories.Count<string>() > 0 && excl.directories.Contains(directoryName))
+                            continue;
+
                         if (!remoteDirectories.ContainsKey(directoryName))
                         {
                             Logger.WriteLine(2, $"Directory {localPath + Path.DirectorySeparatorChar + directoryName} is being created at {remotePath + " / " + directoryName}");
@@ -381,7 +491,7 @@ namespace VMSBuildSync
                             {
                                 await CreateDirectory(_sftp, remotePath + "/" + directoryName);
                             }
-                            catch (SshException ex)
+                            catch (SshException)
                             {
                                 Logger.WriteLine(10, $"Directory {item} already exists but was reported missing");
                             }
@@ -421,7 +531,7 @@ namespace VMSBuildSync
                     sftp.Connect();
                     retrying = true;
                 }
-                catch (Renci.SshNet.Common.SshOperationTimeoutException ex)
+                catch (Renci.SshNet.Common.SshOperationTimeoutException)
                 {
                     sftp.Disconnect();
                     sftp.Connect();
