@@ -461,7 +461,7 @@ namespace VMSBuildSync
                 {
                     var remoteItems = (await ListDirectoryAsync(_sftp, remotePath)).ToList();
                     remoteDirectories = remoteItems.Where(item => item.IsDirectory)
-                        .ToDictionary(item => item.Name.Remove(item.Name.IndexOf(".DIR")));
+                        .ToDictionary(item => item.Name.Remove(item.Name.IndexOf(".DIR")), StringComparer.OrdinalIgnoreCase);
                 }
                 else
                 {
