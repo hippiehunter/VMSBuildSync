@@ -14,6 +14,9 @@ namespace VMSBuildSync
 {
     class Program
     {
+        //If you want to edit directly on VMS and play games with time stamps
+        //we will get out of your way
+        public static bool DontUseSizes = false;
         static async Task Main(string[] args)
         {
             if (args.Length < 8)
@@ -137,6 +140,9 @@ namespace VMSBuildSync
                     tmpArgs[2] = "***";
 
                     Logger.WriteLine(10, $"Startup event (process {Process.GetCurrentProcess().Id}), args were {string.Join(' ', tmpArgs)}");
+
+                    if (args[0] == "triton")
+                        DontUseSizes = true;
 
                     TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
                     using (var remoteSync = new RemoteSync(args[0], args[1], args[2], args[3], args[4], args[5], regexs, args[6], tcs))

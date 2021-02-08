@@ -143,8 +143,11 @@ namespace VMSBuildSync
             var fileTimeStamp = File.GetLastWriteTime(fullPath);
             if (forceOverride)
                 return true;
-            if (!existingFileSizes.TryGetValue(fileName, out var existingSize) || existingSize != fileLength)
-                return true;
+            if (!Program.DontUseSizes)
+            {
+                if (!existingFileSizes.TryGetValue(fileName, out var existingSize) || existingSize != fileLength)
+                    return true;
+            }
             if (!timeStamps.TryGetValue(fileName, out var timeStamp) || timeStamp < fileTimeStamp)
                 return true;
 

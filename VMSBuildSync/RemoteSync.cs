@@ -15,6 +15,7 @@ using System.Diagnostics;
 using System.Threading.Channels;
 using System.Text.Json;
 using System.Net.Sockets;
+using System.Collections.Concurrent;
 
 namespace VMSBuildSync
 {
@@ -36,6 +37,7 @@ namespace VMSBuildSync
         HashSet<string> _activeDirSync = new HashSet<string>();
         private static Regex newLineRegex = new Regex(@"\w*\$\s*$");
         public Channel<string> _fswQueue;
+        public ConcurrentDictionary<string, DateTime> _lastDirectorySync = new ConcurrentDictionary<string, DateTime>();
         public static int SSHTimeout = 480;
         private CancellationTokenSource _cts = new CancellationTokenSource();
         bool exclFile = false;
@@ -174,50 +176,75 @@ namespace VMSBuildSync
          
         private async void RunBackground()
         {
-            var cancelToken = _cts.Token;
-            var exitTask = _tcs.Task;
-            while (!(exitTask.IsCompleted || exitTask.IsFaulted || exitTask.IsCanceled))
+            try
             {
-                var fullPath = await _fswQueue.Reader.ReadAsync();
-                try
+                var cancelToken = _cts.Token;
+                var exitTask = _tcs.Task;
+                while (!(exitTask.IsCompleted || exitTask.IsFaulted || exitTask.IsCanceled))
                 {
-                    var changedPath = Path.GetDirectoryName(fullPath);
-
-                    for (int i = 0; i < 100 && !IsFileReady(fullPath); i++)
-                        await Task.Delay(50);
-
-                    if (!IsFileReady(fullPath))
+                    var fullPath = await _fswQueue.Reader.ReadAsync();
+                    try
                     {
-                        Logger.WriteLine(10, $"synchronizing {fullPath} failed with because it didnt exist on disk (deleted before fsw got to it?)");
-                        return;
-                    }
+                        var changedPath = Path.GetDirectoryName(fullPath);
 
-                    var relativePath = _localRootDirectory == changedPath ? "" : changedPath.Substring(_localRootDirectory.Length).Replace('\\', '/');
-                    var fullRemotePath = _remoteRootDirectory + relativePath;
+                        var fileReady = IsFileReady(fullPath);
+                        for (int i = 0; i < 100 && !fileReady; i++)
+                        {
+                            await Task.Delay(50);
+                            fileReady = IsFileReady(fullPath);
+                        }
 
-                    //check if we're a new directory
-                    if (Directory.Exists(fullPath))
-                    {
-                        await InitialSync(fullPath, fullRemotePath);
-                    }
-                    else
-                    {
-                        var fileInfos = (await SyncDirectoryAsync(changedPath, fullRemotePath, _searchPattern));
-                        if (!fileInfos.Any(fileInfo => string.Compare(fileInfo.Name, Path.GetFileName(fullPath), true) == 0))
-                            Logger.WriteLine(10, $"synchronizing failed for {fullPath}, sync was requested but the remote system had a newer version or something went wrong");
+                        if (!fileReady)
+                        {
+                            Logger.WriteLine(10, $"synchronizing {fullPath} failed with because it didnt exist on disk (deleted before fsw got to it?)");
+                            continue;
+                        }
+
+                        if(_lastDirectorySync.TryGetValue(changedPath, out var lastSynced))
+                        {
+                            //if the last time we sync'ed the folder was newer than this file's update then skip it
+                            //we already sync'ed this file in an earlier request
+                            if(lastSynced > File.GetLastWriteTimeUtc(fullPath))
+                            {
+                                continue;
+                            }
+                        }
+                        
+                        _lastDirectorySync.AddOrUpdate(changedPath, DateTime.UtcNow, (pth,stamp) => DateTime.UtcNow);
+
+                        var relativePath = _localRootDirectory == changedPath ? "" : changedPath.Substring(_localRootDirectory.Length).Replace('\\', '/');
+                        var fullRemotePath = _remoteRootDirectory + relativePath;
+
+                        //check if we're a new directory
+                        if (Directory.Exists(fullPath))
+                        {
+                            await InitialSync(fullPath, fullRemotePath);
+                        }
                         else
                         {
-                            foreach (var fileInfo in fileInfos)
+                            var fileInfos = (await SyncDirectoryAsync(changedPath, fullRemotePath, _searchPattern));
+                            if (!fileInfos.Any(fileInfo => string.Compare(fileInfo.Name, Path.GetFileName(fullPath), true) == 0))
+                                Logger.WriteLine(10, $"synchronizing failed for {fullPath}, sync was requested but the remote system had a newer version or something went wrong");
+                            else
                             {
-                                Logger.WriteLine(8, "synchronizing " + Path.Combine(Path.GetDirectoryName(fullPath), fileInfo.Name));
+                                foreach (var fileInfo in fileInfos)
+                                {
+                                    Logger.WriteLine(8, "synchronizing " + Path.Combine(Path.GetDirectoryName(fullPath), fileInfo.Name));
+                                }
                             }
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        _fswQueue.Writer.TryWrite(fullPath);
+                        Logger.WriteLine(10, $"synchronizing {fullPath} failed with {ex} sleeping 60 seconds to settle connection, item requeued");
+                        await Task.Delay(60000);
+                    }
                 }
-                catch (Exception ex)
-                {
-                    Logger.WriteLine(10, $"synchronizing {fullPath} failed with {ex}");
-                }
+            }
+            finally
+            {
+                Logger.WriteLine(10, $"fsw background task is exiting");
             }
         }
 
@@ -596,11 +623,11 @@ namespace VMSBuildSync
 
         public static bool IsFileReady(String sFilename)
         {
-            // If the file can be opened for exclusive access it means that the file
-            // is no longer locked by another process.
+            // If the file can be opened for readonly access it means that the file
+            // is no longer locked for write by another process.
             try
             {
-                using (FileStream inputStream = File.Open(sFilename, FileMode.Open, FileAccess.Read, FileShare.None))
+                using (FileStream inputStream = File.Open(sFilename, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
                     if (inputStream.Length > 0)
                     {
