@@ -115,6 +115,13 @@ namespace VMSBuildSync
                             excl.ftypes[ix] = excl.ftypes[ix].ToLower();
                         }
                     }
+                    if (excl.directories.Count<string>() > 0)
+                    {
+                        for (int ix = 0; ix < excl.directories.Count<string>() - 1; ix++)
+                        {
+                            excl.directories[ix] = excl.directories[ix].ToUpper();
+                        }
+                    }
                     Logger.WriteLine(10, $"file and folder exclusions loaded from exclusions.json");
                 }
                 catch
@@ -505,6 +512,7 @@ namespace VMSBuildSync
                 try
                 {
                     var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
+                    directoryName = directoryName.ToUpper();
                     if (!directoryName.Contains("."))
                     {
 
