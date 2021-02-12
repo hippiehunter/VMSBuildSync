@@ -101,11 +101,19 @@ namespace VMSBuildSync
             });
 
             //If we have an exclusions.json file, load it
+            //get the application folder
+            string assemblyPath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            Logger.WriteLine(5, "Application is running from " + assemblyPath);
             if (File.Exists("exclusions.json"))
+            {
+                assemblyPath = ".";
+            }
+            Logger.WriteLine(5, "Checking for exclusions in " + assemblyPath);
+            if (File.Exists(assemblyPath + "\\exclusions.json"))
             {
                 try
                 {
-                    string readExclusions = File.ReadAllText(@"exclusions.json"); //both windows (alt) and linux use / as separator
+                    string readExclusions = File.ReadAllText(assemblyPath + "\\exclusions.json"); //both windows (alt) and linux use / as separator
                     excl = JsonSerializer.Deserialize<Exclusions>(readExclusions);
                     //Lower case all the file extensions
                     if (excl.ftypes.Count<string>() > 0)
@@ -508,7 +516,7 @@ namespace VMSBuildSync
                     if (!directoryName.Contains("."))
                     {
 
-                        if (excl != null && excl.directories.Count<string>() > 0 && excl.directories.Contains(directoryName))
+                        if (excl != null && excl.directories.Count<string>() > 0 && excl.directories.Contains(directoryName,StringComparer.OrdinalIgnoreCase))
                             continue;
 
                         if (!remoteDirectories.ContainsKey(directoryName))
