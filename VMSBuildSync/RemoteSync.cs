@@ -101,11 +101,19 @@ namespace VMSBuildSync
             });
 
             //If we have an exclusions.json file, load it
+            //get the application folder
+            string assemblyPath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            Logger.WriteLine(5, "Application is running from " + assemblyPath);
             if (File.Exists("exclusions.json"))
+			{
+                assemblyPath = ".";
+			}
+            Logger.WriteLine(5, "Checking for exclusions in " + assemblyPath);
+            if (File.Exists(assemblyPath + "\\exclusions.json"))
             {
                 try
                 {
-                    string readExclusions = File.ReadAllText(@"exclusions.json"); //both windows (alt) and linux use / as separator
+                    string readExclusions = File.ReadAllText(assemblyPath + "\\exclusions.json"); //both windows (alt) and linux use / as separator
                     excl = JsonSerializer.Deserialize<Exclusions>(readExclusions);
                     //Lower case all the file extensions
                     if (excl.ftypes.Count<string>() > 0)
@@ -113,13 +121,6 @@ namespace VMSBuildSync
                         for (int ix = 0; ix < excl.ftypes.Count<string>() - 1; ix++)
                         {
                             excl.ftypes[ix] = excl.ftypes[ix].ToLower();
-                        }
-                    }
-                    if (excl.directories.Count<string>() > 0)
-                    {
-                        for (int ix = 0; ix < excl.directories.Count<string>() - 1; ix++)
-                        {
-                            excl.directories[ix] = excl.directories[ix].ToUpper();
                         }
                     }
                     Logger.WriteLine(10, $"file and folder exclusions loaded from exclusions.json");
@@ -512,11 +513,10 @@ namespace VMSBuildSync
                 try
                 {
                     var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
-                    directoryName = directoryName.ToUpper();
                     if (!directoryName.Contains("."))
                     {
 
-                        if (excl != null && excl.directories.Count<string>() > 0 && excl.directories.Contains(directoryName))
+                        if (excl != null && excl.directories.Count<string>() > 0 && excl.directories.Contains(directoryName,StringComparer.OrdinalIgnoreCase))
                             continue;
 
                         if (!remoteDirectories.ContainsKey(directoryName))
