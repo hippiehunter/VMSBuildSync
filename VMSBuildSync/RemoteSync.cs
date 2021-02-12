@@ -105,9 +105,9 @@ namespace VMSBuildSync
             string assemblyPath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
             Logger.WriteLine(5, "Application is running from " + assemblyPath);
             if (File.Exists("exclusions.json"))
-			{
+            {
                 assemblyPath = ".";
-			}
+            }
             Logger.WriteLine(5, "Checking for exclusions in " + assemblyPath);
             if (File.Exists(assemblyPath + "\\exclusions.json"))
             {
